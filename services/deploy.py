@@ -10,15 +10,11 @@ from services.exceptions import WrongVersionException, WrongBuildException
 
 def deploy_or_copy(data: dict):
     logger.info(f'Data: {data}')
-    stages = {
-        "test": "dev",
-        "main": "prod"
-    }
     branch: str = data.get("ref", '').split('/')[-1]
     if branch != settings.STAGE:
         logger.warning(f'Wrong branch: {branch}')
         return
-    stage = stages[branch]
+    stage = settings.STAGES[branch]
     ssh_url: str = data.get("repository", {}).get("ssh_url", '')
     repository_name: str = data.get("repository", {}).get("name")
     message: str = data.get("head_commit", {}).get("message", '')
@@ -61,6 +57,9 @@ def get_version_and_build(message: str) -> Tuple[str, ...]:
 def create_clients_archive_files(
         stage: str, ssh_url: str, repository_name: str, build: str, branch: str, *args, **kwargs
 ) -> None:
+    if repository_name not in settings.CLIENTS:
+        logger.warning(f'Wrong application: {repository_name}')
+        return
     path = '/home/deskent/deploy/clients'
     temp_dir = token_urlsafe(20)
     logger.info(f"Copy files for {repository_name}-{stage}-{build}")

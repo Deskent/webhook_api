@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     ADMINS: list = []
     TELEBOT_TOKEN: str
     STAGE: str
+    STAGES: dict
+    CLIENTS: list
     GITHUB_SECRET: str
 
 
