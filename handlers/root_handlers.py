@@ -25,7 +25,7 @@ def root():
     return {"root": "OK"}
 
 
-@root_router.post('/deploy', status_code=status.HTTP_200_OK, tags=['deploy'])
+@root_router.post('/', status_code=status.HTTP_200_OK, tags=['deploy'])
 async def deploy(
         request: Request,
         response: Response,
