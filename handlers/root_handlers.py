@@ -46,3 +46,5 @@ async def deploy(
         response.status_code = 400
         return {"result": "Wrong content"}
     deploy_or_copy(data=await request.json())
+    return {"result": "ok"}
+

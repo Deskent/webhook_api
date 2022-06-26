@@ -1,12 +1,12 @@
 name: webhook_api
 env:
   PROJECT_NAME: "webhook_api"
-  STAGE: "dev"
+  STAGE: "main"
   VERSION: "ver-${{ github.sha }}"
   COUNT: "1.0"
 on:
   push:
-    branches: [ test ]
+    branches: [ main ]
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -18,4 +18,6 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            ls -la
+            cd /home/${{ secrets.USERNAME }}/deploy/${{ env.PROJECT_NAME }}
+            git checkout ${{ env.STAGE }}
+            git pull
