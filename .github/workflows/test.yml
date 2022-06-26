@@ -1,0 +1,21 @@
+name: webhook_api
+env:
+  PROJECT_NAME: "webhook_api"
+  STAGE: "dev"
+  VERSION: "ver-${{ github.sha }}"
+  COUNT: "1.0"
+on:
+  push:
+    branches: [ test ]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Executing remote ssh commands using ssh key
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            ls -la
