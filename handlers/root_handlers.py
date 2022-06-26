@@ -22,7 +22,7 @@ def validate_signature(header, body):
 
 @root_router.get('/', tags=['root'])
 def root():
-    return {"root": "OK"}
+    return {"root": "OKidoki"}
 
 
 @root_router.post('/', status_code=status.HTTP_200_OK, tags=['deploy'])
