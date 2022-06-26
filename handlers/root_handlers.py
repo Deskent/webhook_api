@@ -10,11 +10,6 @@ from services.deploy import deploy_or_copy
 root_router = APIRouter()
 
 
-@root_router.get('/', tags=['root'])
-def root():
-    return {"root": "OK"}
-
-
 def validate_signature(header, body):
     sha_name, github_signature = header.split('=')
     secret_signature = hmac.new(
@@ -50,5 +45,4 @@ async def deploy(
         logger.error(f"Wrong content: {x_hub_signature_256}")
         response.status_code = 400
         return {"result": "Wrong content"}
-    # todo либо апи не в контейнере запускать, либо ансибл...
     deploy_or_copy(data=await request.json())
