@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     STAGE: str
     STAGES: dict
     CLIENTS: list
+    APPLICATIONS: list
     GITHUB_SECRET: str
 
 
@@ -51,3 +52,4 @@ DATABASE_CONFIG = {
         },
     },
 }
+print(settings.APPLICATIONS)

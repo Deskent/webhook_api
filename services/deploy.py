@@ -95,19 +95,22 @@ def create_clients_archive_files(
 def docker_deploy(
         stage: str, repository_name: str, build: str, user: str, *args, **kwargs
 ) -> None:
+    if repository_name not in settings.APPLICATIONS:
+        logger.warning(f'Wrong application: {repository_name}')
+        return
     path = f'/home/{user}/deploy/{repository_name}/{stage}'
     status: int = os.system(
-        f'echo Create {path} &&'
+        f'echo --- Create {path} &&'
         f'mkdir -p {path} &&'
-        f'echo Go to {path} &&'
+        f'echo --- Go to {path} &&'
         f'cd {path} &&'
-        f'echo Docker down {repository_name}-{stage} &&'
+        f'echo --- Docker down {repository_name}-{stage} &&'
         f'docker-compose -f docker-compose-{repository_name}-{stage}.yml down &&'
-        f'echo Docker remove images &&'
+        f'echo --- Docker remove images &&'
         f'docker rmi {user}/{user}:{repository_name}-{build} -f &&'
-        f'echo Docker up {repository_name}-{stage} &&'
+        f'echo --- Docker up {repository_name}-{stage} &&'
         f'docker-compose -f docker-compose-{repository_name}-{stage}.yml up -d --build &&'
-        f'echo Done'
+        f'echo --- Done'
     )
     text = f"Контейнер {repository_name}-{stage}-{build} развернут."
     if status:
