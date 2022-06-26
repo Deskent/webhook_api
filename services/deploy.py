@@ -33,8 +33,6 @@ def deploy_or_copy(data: dict):
     if repository_name.endswith('_client'):
         create_clients_archive_files(**result)
         return
-    elif repository_name.endswith("_api"):
-        return
     docker_deploy(**result)
 
 
