@@ -67,25 +67,25 @@ def create_clients_archive_files(
     rep_path = os.path.join(path, repository_name)
     temp_path = os.path.join(path, temp_dir)
     status: int = os.system(
-        f'echo Creating {rep_path} &&'
+        f'echo --- Creating {rep_path} &&'
         f'mkdir -p {rep_path} &&'
-        f'echo Creating {temp_path} &&'
+        f'echo --- Creating {temp_path} &&'
         f'mkdir {temp_path} &&'
-        f'echo Go to {temp_path} &&'
+        f'echo --- Go to {temp_path} &&'
         f'cd {temp_path} &&'
-        f'echo Cloning {ssh_url} branch {branch} to {temp_path} &&'
+        f'echo --- Cloning {ssh_url} branch {branch} to {temp_path} &&'
         f'git clone {ssh_url} &&'
-        f'echo Go to {repository_name} &&'
+        f'echo --- Go to {repository_name} &&'
         f'cd {repository_name} &&'
-        f'echo Checkout to brabch {branch} &&'
+        f'echo --- Checkout to branch {branch} &&'
         f'git checkout {branch} &&'
-        f'echo Copy files &&'
-        f'cp {temp_path}/archive/*.* {rep_path} &&'
-        f'cp {temp_path}/README.md {rep_path} &&'
-        f'echo Delete temporary {temp_path} &&'
+        f'echo --- Copy files &&'
+        f'cp {temp_path}/{repository_name}/archive/*.* {rep_path} &&'
+        f'cp {temp_path}/{repository_name}/README.md {rep_path} &&'
+        f'echo --- Delete temporary {temp_path} &&'
         f'cd {path} &&'
         f'rm -rf {temp_dir} &&'
-        f'echo Done'
+        f'echo --- Done'
     )
     text = f"Файлы {repository_name}-{stage}-{build} скопированы"
     if status:
