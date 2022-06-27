@@ -90,6 +90,40 @@ def create_clients_archive_files(
     send_message_to_admins(text)
 
 
+def build_container(
+    stage: str, repository_name: str, build: str, path: str, *args, **kwargs
+) -> int:
+    temp_dir = token_urlsafe(20)
+    temp_path = os.path.join(path, temp_dir)
+    ssh_url = kwargs.get("ssh_url")
+    branch = kwargs.get("branch")
+    logger.info(f"Start building container: {repository_name}-{stage}-{build}")
+    status: int = os.system(
+        f'echo --- Creating {temp_path} &&'
+        f'mkdir -p {temp_path} &&'
+        f'echo --- Go to {temp_path} &&'
+        f'cd {temp_path} &&'
+        f'echo --- Cloning {ssh_url} branch {branch} to {temp_path} &&'
+        f'git clone {ssh_url} &&'
+        f'echo --- Go to {repository_name} &&'
+        f'cd {repository_name} &&'
+        f'echo --- Checkout to branch {branch} &&'
+        f'git checkout {branch} &&'
+        f'echo --- Docker build ... &&'
+        f'docker build . -t {repository_name}:{stage}-{build} &&'
+        f'echo --- Delete temporary {temp_path} &&'
+        f'cd {path} &&'
+        f'rm -rf {temp_dir} &&'
+        f'echo --- Done'
+    )
+    text = f"Контейнер {repository_name}-{stage}-{build} собран."
+    if status:
+        text = f"Ошибка сборки контейнера {repository_name}-{stage}-{build}.\nСтатус-код: {status}"
+    send_message_to_admins(text)
+
+    return status
+
+
 def docker_deploy(
         stage: str, repository_name: str, build: str, user: str, *args, **kwargs
 ) -> None:
@@ -97,19 +131,20 @@ def docker_deploy(
         logger.warning(f'Wrong application: {repository_name}')
         return
     path = f'/home/{user}/deploy/{repository_name}/{stage}'
+    if build_container(
+            stage=stage, repository_name=repository_name, build=build, path=path, *args, **kwargs):
+        return
     status: int = os.system(
-        f'echo --- Create {path} &&'
-        f'mkdir -p {path} &&'
         f'echo --- Go to {path} &&'
         f'cd {path} &&'
         f'echo --- Docker down {repository_name}-{stage} &&'
         f'docker-compose -f docker-compose-{repository_name}-{stage}.yml down &&'
-        f'echo --- Docker remove images &&'
-        f'docker rmi {user}/{user}:{repository_name}-{build} -f &&'
+        f'export VERSION="{stage}-{build}" &&'
         f'echo --- Docker up {repository_name}-{stage} &&'
-        f'docker-compose -f docker-compose-{repository_name}-{stage}.yml up -d --build &&'
+        f'docker-compose -f docker-compose-{repository_name}-{stage}.yml up -d &&'
         f'echo --- Done'
     )
+
     text = f"Контейнер {repository_name}-{stage}-{build} развернут."
     if status:
         text = f"Ошибка развертывания {repository_name}-{stage}-{build}.\nСтатус-код: {status}"
