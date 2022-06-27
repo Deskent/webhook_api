@@ -26,12 +26,12 @@ def deploy_or_copy(data: dict):
     if branch != settings.STAGE:
         logger.warning(f'Wrong branch: {branch}')
         return
-    stage = settings.STAGES[branch]
+    stage: str = settings.STAGES[branch]
     ssh_url: str = data.get("repository", {}).get("ssh_url", '')
     repository_name: str = data.get("repository", {}).get("name")
     message: str = data.get("head_commit", {}).get("message", '')
-    version, build = get_version_and_build(message)
-    user = data.get("repository", {}).get("owner", {}).get("name").lower()
+    version, build = _get_version_and_build(message)
+    user: str = data.get("repository", {}).get("owner", {}).get("name").lower()
     result = DeployData(**dict(
         stage=stage,
         branch=branch,
@@ -43,12 +43,12 @@ def deploy_or_copy(data: dict):
     ))
     logger.info(f"Result: {result}")
     if repository_name.endswith('_client'):
-        create_clients_archive_files(result)
-        return
-    docker_deploy(result)
+        _create_clients_archive_files(result)
+    else:
+        _docker_deploy(result)
 
 
-def get_version_and_build(message: str) -> Tuple[str, ...]:
+def _get_version_and_build(message: str) -> Tuple[str, ...]:
     version: list = re.findall(r"version:(.{,20})]", message)
     if not version:
         text = f"Wrong version: {message}"
@@ -64,7 +64,7 @@ def get_version_and_build(message: str) -> Tuple[str, ...]:
     return version[0], build[0]
 
 
-def create_clients_archive_files(payload: DeployData) -> None:
+def _create_clients_archive_files(payload: DeployData) -> None:
     if payload.repository_name not in settings.CLIENTS:
         logger.warning(f'Wrong application: {payload.repository_name}')
         return
@@ -103,10 +103,38 @@ def create_clients_archive_files(payload: DeployData) -> None:
     send_message_to_admins(text)
 
 
-def build_container(payload: DeployData, path: str) -> int:
+def _docker_deploy(payload: DeployData) -> None:
+    if payload.repository_name not in settings.APPLICATIONS:
+        logger.warning(f'Wrong application: {payload.repository_name}')
+        return
+    path = f'/home/{payload.user}/deploy/{payload.repository_name}/{payload.stage}'
+    container = f'{payload.repository_name}-{payload.stage}-{payload.version}'
+    os.system(f'docker rmi $(docker images -q)')
+    if _build_container(payload, path, container):
+        return
+    logger.info(f"Starting container: {container}")
+    status: int = os.system(
+        f'echo --- Restarting container {container}'
+        f'cd {path} &&'
+        f'docker-compose -f docker-compose-{payload.repository_name}-{payload.stage}.yml down &&'
+        f'export VERSION="{payload.stage}-{payload.version}" &&'
+        f'docker-compose -f docker-compose-{payload.repository_name}-{payload.stage}.yml up -d &&'
+        f'echo --- Done'
+    )
+
+    text = f"Контейнер {container} развернут."
+    if status:
+        text = (
+            f"Ошибка развертывания {container}."
+            f"\nСтатус-код: {status}"
+        )
+    send_message_to_admins(text)
+
+
+def _build_container(payload: DeployData, path: str, container: str) -> int:
     temp_dir = token_urlsafe(20)
     temp_path = os.path.join(path, temp_dir)
-    logger.info(f"Start building container: {payload.repository_name}-{payload.stage}-{payload.version}")
+    logger.info(f"Start building container: {container}")
     status: int = os.system(
         f'echo --- Creating {temp_path} &&'
         f'mkdir -p {temp_path} &&'
@@ -125,38 +153,11 @@ def build_container(payload: DeployData, path: str) -> int:
         f'rm -rf {temp_dir} &&'
         f'echo --- Done'
     )
-    text = f"Контейнер {payload.repository_name}-{payload.stage}-{payload.version} собран."
+    text = f"Контейнер {container} собран."
     if status:
         text = (
-            f"Ошибка сборки контейнера {payload.repository_name}-{payload.stage}-{payload.version}."
+            f"Ошибка сборки контейнера {container}."
             f"\nСтатус-код: {status}")
     send_message_to_admins(text)
 
     return status
-
-
-def docker_deploy(payload: DeployData) -> None:
-    if payload.repository_name not in settings.APPLICATIONS:
-        logger.warning(f'Wrong application: {payload.repository_name}')
-        return
-    path = f'/home/{payload.user}/deploy/{payload.repository_name}/{payload.stage}'
-    if build_container(payload, path):
-        return
-    status: int = os.system(
-        f'echo --- Go to {path} &&'
-        f'cd {path} &&'
-        f'echo --- Docker down {payload.repository_name}-{payload.stage} &&'
-        f'docker-compose -f docker-compose-{payload.repository_name}-{payload.stage}.yml down &&'
-        f'export VERSION="{payload.stage}-{payload.version}" &&'
-        f'echo --- Docker up {payload.repository_name}-{payload.stage} &&'
-        f'docker-compose -f docker-compose-{payload.repository_name}-{payload.stage}.yml up -d &&'
-        f'echo --- Done'
-    )
-
-    text = f"Контейнер {payload.repository_name}-{payload.stage}-{payload.version} развернут."
-    if status:
-        text = (
-            f"Ошибка развертывания {payload.repository_name}-{payload.stage}-{payload.version}."
-            f"\nСтатус-код: {status}"
-        )
-    send_message_to_admins(text)
