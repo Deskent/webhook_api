@@ -52,4 +52,3 @@ DATABASE_CONFIG = {
         },
     },
 }
-print(settings.APPLICATIONS)

@@ -3,9 +3,21 @@ import re
 from secrets import token_urlsafe
 from typing import Tuple
 
+from pydantic import BaseModel
+
 from services.utils import send_message_to_admins
 from config import logger, settings
 from services.exceptions import WrongVersionException, WrongBuildException
+
+
+class DeployData(BaseModel):
+    branch: str
+    stage: str
+    repository_name: str
+    version: str
+    build: str
+    user: str
+    ssh_url: str
 
 
 def deploy_or_copy(data: dict):
@@ -20,7 +32,7 @@ def deploy_or_copy(data: dict):
     message: str = data.get("head_commit", {}).get("message", '')
     version, build = get_version_and_build(message)
     user = data.get("repository", {}).get("owner", {}).get("name").lower()
-    result = dict(
+    result = DeployData(**dict(
         stage=stage,
         branch=branch,
         ssh_url=ssh_url,
@@ -28,12 +40,12 @@ def deploy_or_copy(data: dict):
         version=version,
         build=build,
         user=user
-    )
+    ))
     logger.info(f"Result: {result}")
     if repository_name.endswith('_client'):
-        create_clients_archive_files(**result)
+        create_clients_archive_files(result)
         return
-    docker_deploy(**result)
+    docker_deploy(result)
 
 
 def get_version_and_build(message: str) -> Tuple[str, ...]:
@@ -52,16 +64,14 @@ def get_version_and_build(message: str) -> Tuple[str, ...]:
     return version[0], build[0]
 
 
-def create_clients_archive_files(
-        stage: str, ssh_url: str, repository_name: str, build: str, branch: str, *args, **kwargs
-) -> None:
-    if repository_name not in settings.CLIENTS:
-        logger.warning(f'Wrong application: {repository_name}')
+def create_clients_archive_files(payload: DeployData) -> None:
+    if payload.repository_name not in settings.CLIENTS:
+        logger.warning(f'Wrong application: {payload.repository_name}')
         return
     path = '/home/deskent/deploy/clients'
     temp_dir = token_urlsafe(20)
-    logger.info(f"Copy files for {repository_name}-{stage}-{build}")
-    rep_path = os.path.join(path, repository_name)
+    logger.info(f"Copy files for {payload.repository_name}-{payload.stage}-{payload.build}")
+    rep_path = os.path.join(path, payload.repository_name)
     temp_path = os.path.join(path, temp_dir)
     status: int = os.system(
         f'echo --- Creating {rep_path} &&'
@@ -70,82 +80,83 @@ def create_clients_archive_files(
         f'mkdir {temp_path} &&'
         f'echo --- Go to {temp_path} &&'
         f'cd {temp_path} &&'
-        f'echo --- Cloning {ssh_url} branch {branch} to {temp_path} &&'
-        f'git clone {ssh_url} &&'
-        f'echo --- Go to {repository_name} &&'
-        f'cd {repository_name} &&'
-        f'echo --- Checkout to branch {branch} &&'
-        f'git checkout {branch} &&'
+        f'echo --- Cloning {payload.ssh_url} branch {payload.branch} to {temp_path} &&'
+        f'git clone {payload.ssh_url} &&'
+        f'echo --- Go to {payload.repository_name} &&'
+        f'cd {payload.repository_name} &&'
+        f'echo --- Checkout to branch {payload.branch} &&'
+        f'git checkout {payload.branch} &&'
         f'echo --- Copy files &&'
-        f'cp {temp_path}/{repository_name}/archive/*.* {rep_path} &&'
-        f'cp {temp_path}/{repository_name}/README.md {rep_path} &&'
+        f'cp {temp_path}/{payload.repository_name}/archive/*.* {rep_path} &&'
+        f'cp {temp_path}/{payload.repository_name}/README.md {rep_path} &&'
         f'echo --- Delete temporary {temp_path} &&'
         f'cd {path} &&'
         f'rm -rf {temp_dir} &&'
         f'echo --- Done'
     )
-    text = f"Файлы {repository_name}-{stage}-{build} скопированы"
+    text = f"Файлы {payload.repository_name}-{payload.stage}-{payload.build} скопированы"
     if status:
-        text = f"Ошибка копирования {repository_name}-{stage}-{build}.\nСтатус-код: {status}"
+        text = (
+            f"Ошибка копирования {payload.repository_name}-{payload.stage}-{payload.build}."
+            f"\nСтатус-код: {status}"
+        )
     send_message_to_admins(text)
 
 
-def build_container(
-    stage: str, repository_name: str, build: str, path: str, *args, **kwargs
-) -> int:
+def build_container(payload: DeployData, path: str) -> int:
     temp_dir = token_urlsafe(20)
     temp_path = os.path.join(path, temp_dir)
-    ssh_url = kwargs.get("ssh_url")
-    branch = kwargs.get("branch")
-    logger.info(f"Start building container: {repository_name}-{stage}-{build}")
+    logger.info(f"Start building container: {payload.repository_name}-{payload.stage}-{payload.version}")
     status: int = os.system(
         f'echo --- Creating {temp_path} &&'
         f'mkdir -p {temp_path} &&'
         f'echo --- Go to {temp_path} &&'
         f'cd {temp_path} &&'
-        f'echo --- Cloning {ssh_url} branch {branch} to {temp_path} &&'
-        f'git clone {ssh_url} &&'
-        f'echo --- Go to {repository_name} &&'
-        f'cd {repository_name} &&'
-        f'echo --- Checkout to branch {branch} &&'
-        f'git checkout {branch} &&'
-        f'echo --- Docker build ... &&'
-        f'docker build . -t {repository_name}:{stage}-{build} &&'
+        f'echo --- Cloning {payload.ssh_url} branch {payload.branch} to {temp_path} &&'
+        f'git clone {payload.ssh_url} &&'
+        f'echo --- Go to {payload.repository_name} &&'
+        f'cd {payload.repository_name} &&'
+        f'echo --- Checkout to branch {payload.branch} &&'
+        f'git checkout {payload.branch} &&'
+        f'echo --- Docker build start &&'
+        f'docker build . -t {payload.repository_name}:{payload.stage}-{payload.version} &&'
         f'echo --- Delete temporary {temp_path} &&'
         f'cd {path} &&'
         f'rm -rf {temp_dir} &&'
         f'echo --- Done'
     )
-    text = f"Контейнер {repository_name}-{stage}-{build} собран."
+    text = f"Контейнер {payload.repository_name}-{payload.stage}-{payload.version} собран."
     if status:
-        text = f"Ошибка сборки контейнера {repository_name}-{stage}-{build}.\nСтатус-код: {status}"
+        text = (
+            f"Ошибка сборки контейнера {payload.repository_name}-{payload.stage}-{payload.version}."
+            f"\nСтатус-код: {status}")
     send_message_to_admins(text)
 
     return status
 
 
-def docker_deploy(
-        stage: str, repository_name: str, build: str, user: str, *args, **kwargs
-) -> None:
-    if repository_name not in settings.APPLICATIONS:
-        logger.warning(f'Wrong application: {repository_name}')
+def docker_deploy(payload: DeployData) -> None:
+    if payload.repository_name not in settings.APPLICATIONS:
+        logger.warning(f'Wrong application: {payload.repository_name}')
         return
-    path = f'/home/{user}/deploy/{repository_name}/{stage}'
-    if build_container(
-            stage=stage, repository_name=repository_name, build=build, path=path, *args, **kwargs):
+    path = f'/home/{payload.user}/deploy/{payload.repository_name}/{payload.stage}'
+    if build_container(payload, path):
         return
     status: int = os.system(
         f'echo --- Go to {path} &&'
         f'cd {path} &&'
-        f'echo --- Docker down {repository_name}-{stage} &&'
-        f'docker-compose -f docker-compose-{repository_name}-{stage}.yml down &&'
-        f'export VERSION="{stage}-{build}" &&'
-        f'echo --- Docker up {repository_name}-{stage} &&'
-        f'docker-compose -f docker-compose-{repository_name}-{stage}.yml up -d &&'
+        f'echo --- Docker down {payload.repository_name}-{payload.stage} &&'
+        f'docker-compose -f docker-compose-{payload.repository_name}-{payload.stage}.yml down &&'
+        f'export VERSION="{payload.stage}-{payload.version}" &&'
+        f'echo --- Docker up {payload.repository_name}-{payload.stage} &&'
+        f'docker-compose -f docker-compose-{payload.repository_name}-{payload.stage}.yml up -d &&'
         f'echo --- Done'
     )
 
-    text = f"Контейнер {repository_name}-{stage}-{build} развернут."
+    text = f"Контейнер {payload.repository_name}-{payload.stage}-{payload.version} развернут."
     if status:
-        text = f"Ошибка развертывания {repository_name}-{stage}-{build}.\nСтатус-код: {status}"
+        text = (
+            f"Ошибка развертывания {payload.repository_name}-{payload.stage}-{payload.version}."
+            f"\nСтатус-код: {status}"
+        )
     send_message_to_admins(text)
