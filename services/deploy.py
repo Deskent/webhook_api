@@ -99,6 +99,7 @@ def _create_clients_archive_files(payload: DeployData) -> None:
         text = (
             f"Ошибка копирования {payload.repository_name}-{payload.stage}-{payload.build}."
             f"\nСтатус-код: {status}"
+            f"\nBuild: {payload.build}"
         )
     send_message_to_admins(text)
 
@@ -122,11 +123,12 @@ def _docker_deploy(payload: DeployData) -> None:
         f'echo --- Done'
     )
 
-    text = f"Контейнер {container} развернут."
+    text = f"Контейнер {container} развернут.\nBuild: {payload.build}"
     if status:
         text = (
             f"Ошибка развертывания {container}."
             f"\nСтатус-код: {status}"
+            f"\nBuild: {payload.build}"
         )
     send_message_to_admins(text)
 
@@ -153,11 +155,13 @@ def _build_container(payload: DeployData, path: str, container: str) -> int:
         f'rm -rf {temp_dir} &&'
         f'echo --- Done'
     )
-    text = f"Контейнер {container} собран."
+    text = f"Контейнер {container} собран.\nBuild: {payload.build}"
     if status:
         text = (
             f"Ошибка сборки контейнера {container}."
-            f"\nСтатус-код: {status}")
+            f"\nСтатус-код: {status}"
+            f"\nBuild: {payload.build}"
+        )
     send_message_to_admins(text)
 
     return status
