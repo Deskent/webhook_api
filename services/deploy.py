@@ -115,7 +115,7 @@ def _docker_deploy(payload: DeployData) -> None:
         return
     logger.info(f"Starting container: {container}")
     status: int = os.system(
-        f'echo --- Restarting container {container}'
+        f'echo --- Restarting container {container} &&'
         f'cd {path} &&'
         f'docker-compose -f docker-compose-{payload.repository_name}-{payload.stage}.yml down &&'
         f'export VERSION="{payload.stage}-{payload.version}" &&'
