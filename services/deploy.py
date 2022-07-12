@@ -86,9 +86,6 @@ class Payload(BaseModel):
             f'git checkout {self.branch} &&'
             f'echo --- Docker build start &&'
             f'docker build . -t {self.repository_name}:{self.stage}-{self.version} &&'
-            f'echo --- Delete temporary {self.path} &&'
-            f'cd {self.path} &&'
-            f'rm -rf {self.repository_name} &&'
             f'echo --- Done'
         )
         text = f"Контейнер {self.container} собран.\nBuild: {self.build}"
