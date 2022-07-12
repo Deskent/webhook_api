@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     CLIENTS: list
     APPLICATIONS: list
     GITHUB_SECRET: str
+    LOCATION: str
 
 
 class Database(BaseSettings):

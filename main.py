@@ -2,7 +2,7 @@ from fastapi import FastAPI
 
 from routers import api_router
 from database import db_connect
-from config import logger
+from config import logger, settings
 from services.utils import send_message_to_admins
 from _resources import __version__, __appname__, __build__
 
@@ -14,6 +14,7 @@ def get_application() -> FastAPI:
     send_message_to_admins(f"{__appname__.title()} started."
                            f"\nBuild:[{__build__}]"
                            f"\nVersion:[{__version__}]"
+                           f"Location: [{settings.LOCATION}]"
     )
     application = FastAPI()
     db_connect(application)
