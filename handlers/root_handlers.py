@@ -1,5 +1,6 @@
 import hmac
 import hashlib
+import json
 
 from fastapi import APIRouter, Request, Header, Response, status
 
@@ -50,5 +51,10 @@ async def deploy(
         logger.error(f"Wrong content: {x_hub_signature_256}")
         response.status_code = 400
         return {"result": "Wrong content"}
-    deploy_or_copy(data=await request.json())
+    try:
+        data: dict = await request.json()
+        deploy_or_copy(data)
+    except json.decoder.JSONDecodeError as err:
+        logger.error(err)
+        return {"result": "json error"}
     return {"result": "ok"}
