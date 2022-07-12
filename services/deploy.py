@@ -28,9 +28,9 @@ class Payload(BaseModel):
         self.path = f'/home/{self.user}/deploy/{self.repository_name}/{self.stage}'
         self.container = f'{self.repository_name}-{self.stage}-{self.version}'
         os.system(f'docker rmi $(docker images -q)')
-        if self._build_container():
-            return
         if self._testing_container():
+            return
+        if self._build_container():
             return
         self._docker_deploy()
 
@@ -55,12 +55,15 @@ class Payload(BaseModel):
 
     def _testing_container(self):
         status: int = os.system(
-            f'cd {self.path}/{self.repository_name} &&'
-            'docker run python:3.10-alpine pip install pytest && python -s -v -m pytest --disable-warnings tests/ &&'
-            f'echo --- Delete temporary {self.path} &&'
+            f'echo --- Go to {self.path} &&'
             f'cd {self.path} &&'
-            f'rm -rf {self.repository_name} &&'
-            f'echo --- Done'
+            f'echo --- Cloning {self.ssh_url} branch {self.branch} to {self.path} &&'
+            f'git clone {self.ssh_url} &&'
+            f'echo --- Go to {self.repository_name} &&'
+            f'cd {self.repository_name} &&'
+            f'echo --- Checkout to branch {self.branch} &&'
+            f'git checkout {self.branch} &&'
+            'docker run python:3.10-alpine pip install pytest && python -s -v -m pytest --disable-warnings tests/ &&'
         )
         text = f"Контейнер {self.container} протестирован.\nBuild: {self.build}"
         if status:
@@ -78,14 +81,15 @@ class Payload(BaseModel):
         status: int = os.system(
             f'echo --- Go to {self.path} &&'
             f'cd {self.path} &&'
-            f'echo --- Cloning {self.ssh_url} branch {self.branch} to {self.path} &&'
-            f'git clone {self.ssh_url} &&'
             f'echo --- Go to {self.repository_name} &&'
             f'cd {self.repository_name} &&'
             f'echo --- Checkout to branch {self.branch} &&'
             f'git checkout {self.branch} &&'
             f'echo --- Docker build start &&'
             f'docker build . -t {self.repository_name}:{self.stage}-{self.version} &&'
+            f'echo --- Delete temporary {self.path} &&'
+            f'cd {self.path} &&'
+            f'rm -rf {self.repository_name} &&'
             f'echo --- Done'
         )
         text = f"Контейнер {self.container} собран.\nBuild: {self.build}"
