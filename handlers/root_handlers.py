@@ -52,4 +52,3 @@ async def deploy(
         return {"result": "Wrong content"}
     deploy_or_copy(data=await request.json())
     return {"result": "ok"}
-
