@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 # -*- coding: UTF-8 -*-
 """
-Python 3.7
+Python 3.8.1
 """
 
 import uvicorn
