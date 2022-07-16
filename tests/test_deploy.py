@@ -1,5 +1,5 @@
 import pytest
-from services.deploy import Docker, ContainerBuildError
+from services.deploy import Docker, ContainerBuildError, ContainerPrepareError
 
 
 def test_prepare_error_wrong_repository(payload):
@@ -11,7 +11,8 @@ def test_prepare_error_wrong_repository(payload):
 def test_prepare_error_wrong_path(payload):
     payload.update(path='error')
     obj = Docker(**payload)
-    assert obj._prepare() is False
+    with pytest.raises(ContainerPrepareError):
+        obj._prepare()
 
 
 def test_build_wrong_branch(payload):
