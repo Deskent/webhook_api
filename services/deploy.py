@@ -38,7 +38,8 @@ class Docker(Payload):
             self._running_container()
         except (ContainerBuildError, ContainerTestError, ContainerRunError) as err:
             logger.exception(err)
-            send_message_to_admins(err.args[0])
+            text = err.args[0] if err.args else err
+            send_message_to_admins(text)
             raise
         return True
 
@@ -130,7 +131,7 @@ class Docker(Payload):
             f'cd {self.full_path}'
             f'&& export VERSION="{self.stage}-{self.version}"'
             f'&& export APPNAME="{self.repository_name}"'
-            f'&& docker-compose down'
+            f'&& docker-compose down --remove-orphans'
             f'&& docker-compose up -d'
             f'&& echo --- Done'
         )
