@@ -1,35 +1,17 @@
+from typing import Any, Optional, Dict
+
 from fastapi import HTTPException
 from starlette import status
 
-exception_unauthorized = HTTPException(
+UnauthorizedError = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail='Access denied'
 )
 
-
-exception_not_found = HTTPException(
+NotFoundError = HTTPException(
     status_code=status.HTTP_404_NOT_FOUND,
     detail='Error data'
 )
-
-
-wallet_error = HTTPException(
-    status_code=status.HTTP_406_NOT_ACCEPTABLE,
-    detail='Wallet exists'
-)
-
-
-UserExistsException = HTTPException(
-    status_code=status.HTTP_409_CONFLICT,
-    detail='User exists'
-)
-
-
-UserNotFoundException = HTTPException(
-    status_code=status.HTTP_404_NOT_FOUND,
-    detail='User not found'
-)
-
 
 WrongVersionException = HTTPException(
     status_code=status.HTTP_406_NOT_ACCEPTABLE,
@@ -40,3 +22,21 @@ WrongBuildException = HTTPException(
     status_code=status.HTTP_406_NOT_ACCEPTABLE,
     detail='Wrong build'
 )
+
+
+class ContainerBuildError(HTTPException):
+    def __init__(self, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                 detail='Container building error'):
+        super(ContainerBuildError, self).__init__(status_code=status_code, detail=detail)
+
+
+class ContainerTestError(HTTPException):
+    def __init__(self, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                 detail='Container testing error'):
+        super(ContainerTestError, self).__init__(status_code=status_code, detail=detail)
+
+
+class ContainerRunError(HTTPException):
+    def __init__(self, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                 detail='Container running error'):
+        super(ContainerRunError, self).__init__(status_code=status_code, detail=detail)

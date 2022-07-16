@@ -1,5 +1,6 @@
 import os
 import re
+import subprocess
 from secrets import token_urlsafe
 from typing import Tuple
 
@@ -7,7 +8,10 @@ from pydantic import BaseModel
 
 from services.utils import send_message_to_admins
 from config import logger, settings
-from services.exceptions import WrongVersionException, WrongBuildException
+from services.exceptions import (
+    WrongVersionException, WrongBuildException, ContainerBuildError, ContainerTestError,
+    ContainerRunError
+)
 
 
 class Payload(BaseModel):
@@ -19,89 +23,140 @@ class Payload(BaseModel):
     user: str
     ssh_url: str
     path: str = ''
+    full_path: str = ''
     container: str = ''
 
-    def docker_deploy(self) -> None:
+
+class Docker(Payload):
+
+    def deploy(self) -> bool:
+        if not self._prepare():
+            return False
+        try:
+            self._build_container()
+            self._testing_container()
+            self._running_container()
+        except (ContainerBuildError, ContainerTestError, ContainerRunError) as err:
+            logger.exception(err)
+            send_message_to_admins(err.args[0])
+            raise
+        return True
+
+    def _prepare(self):
         if self.repository_name not in settings.APPLICATIONS:
             logger.warning(f'Wrong application: {self.repository_name}')
-            return
-        self.path = f'/home/{self.user}/deploy/{self.repository_name}/{self.stage}'
+            return False
+        if not self.path:
+            self.path = f'/home/{self.user}/deploy/{self.repository_name}/{self.stage}'
+        if not os.path.exists(self.path):
+            logger.warning(f'{self.path} does not exists.')
+            return False
+        self.full_path = f'/home/{self.user}/deploy/{self.repository_name}/{self.stage}/{self.repository_name}'
         self.container = f'{self.repository_name}-{self.stage}-{self.version}'
-        os.system(f'docker rmi $(docker images -q)')
-        if self._testing_container():
-            return
-        if self._build_container():
-            return
-        self._docker_deploy()
+        self._run_command(f'docker rmi $(docker images -q)')
+        return True
 
-    def _docker_deploy(self):
-        logger.info(f"Starting container: {self.container}")
-        status: int = os.system(
-            f'cd {self.path} &&'
-            f'docker-compose -f docker-compose-{self.repository_name}-{self.stage}.yml down &&'
-            f'export VERSION="{self.stage}-{self.version}" &&'
-            f'docker-compose -f docker-compose-{self.repository_name}-{self.stage}.yml up -d &&'
-            f'echo --- Done'
+    def _clone_repository(self) -> int:
+        return self._run_command(
+            f'git clone -b {self.branch} git@github.com:{self.user}/{self.repository_name}.git {self.full_path}'
+            f'&& cp {self.path}/.env {self.full_path}'
         )
 
-        text = f"Контейнер {self.container} развернут.\nBuild: {self.build}"
-        if status:
-            text = (
-                f"Ошибка развертывания {self.container}."
-                f"\nСтатус-код: {status}"
-                f"\nBuild: {self.build}"
-            )
-        send_message_to_admins(text)
-
-    def _testing_container(self):
-        status: int = os.system(
-            f'echo --- Go to {self.path} &&'
-            f'cd {self.path} &&'
-            f'echo --- Cloning {self.ssh_url} branch {self.branch} to {self.path} &&'
-            f'git clone {self.ssh_url} &&'
-            f'echo --- Go to {self.repository_name} &&'
-            f'cd {self.repository_name} &&'
-            f'echo --- Checkout to branch {self.branch} &&'
-            f'git checkout {self.branch} &&'
-            'docker run python:3.10-alpine pip install pytest && python -s -v -m pytest --disable-warnings tests/ &&'
+    def _pull_repository(self) -> int:
+        return self._run_command(
+            f'cd {self.full_path}'
+            f'&& git checkout {self.branch}'
+            f'&& git pull'
         )
-        text = f"Контейнер {self.container} протестирован.\nBuild: {self.build}"
-        if status:
-            text = (
-                f"Ошибка тестирования контейнера {self.container}."
-                f"\nСтатус-код: {status}"
-                f"\nBuild: {self.build}"
-            )
-        send_message_to_admins(text)
-
-        return status
 
     def _build_container(self) -> int:
         logger.info(f"Start building container: {self.container}")
-        status: int = os.system(
-            f'echo --- Go to {self.path} &&'
-            f'cd {self.path} &&'
-            f'echo --- Go to {self.repository_name} &&'
-            f'cd {self.repository_name} &&'
-            f'echo --- Checkout to branch {self.branch} &&'
-            f'git checkout {self.branch} &&'
-            f'echo --- Docker build start &&'
-            f'docker build . -t {self.repository_name}:{self.stage}-{self.version} &&'
-            f'echo --- Delete temporary {self.path} &&'
-            f'cd {self.path} &&'
-            f'rm -rf {self.repository_name} &&'
-            f'echo --- Done'
-        )
-        text = f"Контейнер {self.container} собран.\nBuild: {self.build}"
-        if status:
+        if not os.path.exists(self.full_path):
+            if self._clone_repository():
+                text = (
+                    f"Ошибка клонирования {self.container}"
+                    f"\nBuild: {self.build}"
+                )
+                send_message_to_admins(text)
+                raise ContainerBuildError(detail=text)
+        if self._pull_repository():
             text = (
-                f"Ошибка сборки контейнера {self.container}."
-                f"\nСтатус-код: {status}"
+                f"Ошибка пулла: {self.container}"
                 f"\nBuild: {self.build}"
             )
-        send_message_to_admins(text)
+            send_message_to_admins(text)
+            raise ContainerBuildError(detail=text)
+        status: int = self._run_command(
+            f'cd {self.full_path}'
+            f'&& git checkout {self.branch}'
+            f'&& export VERSION="{self.stage}-{self.version}"'
+            f'&& export APPNAME="{self.repository_name}"'
+            f'&& docker build . -t {self.repository_name}:{self.stage}-{self.version}'
+        )
+        if status == 0:
+            text = f"Контейнер {self.container} собран.\nBuild: {self.build}"
+            send_message_to_admins(text)
+            return status
 
-        return status
+        text = (
+            f"Ошибка сборки контейнера {self.container}."
+            f"\nBuild: {self.build}"
+        )
+        raise ContainerBuildError(detail=text)
+
+    def _testing_container(self):
+        logger.info(f"Start testing container: {self.container}")
+        status = self._run_command(
+            f'cd {self.full_path}'
+            f'&& git checkout {self.branch}'
+            f'&& export VERSION="{self.stage}-{self.version}"'
+            f'&& export APPNAME="{self.repository_name}"'
+            f'&& docker-compose run --rm app pytest -s -v -k server tests/'
+        )
+        if status == 0:
+            text = f"Контейнер {self.container} протестирован.\nBuild: {self.build}"
+            send_message_to_admins(text)
+            return status
+
+        text = (
+            f"Ошибка тестирования контейнера {self.container}."
+            f"\nBuild: {self.build}"
+        )
+        raise ContainerTestError(detail=text)
+
+    def _running_container(self):
+        logger.info(f"Starting container: {self.container}")
+        status: int = self._run_command(
+            f'cd {self.full_path}'
+            f'&& export VERSION="{self.stage}-{self.version}"'
+            f'&& export APPNAME="{self.repository_name}"'
+            f'&& docker-compose down'
+            f'&& docker-compose up -d'
+            f'&& echo --- Done'
+        )
+        if status == 0:
+            text = f"Контейнер {self.container} развернут.\nBuild: {self.build}"
+            send_message_to_admins(text)
+            return status
+        text = (
+            f"Ошибка развертывания {self.container}."
+            f"\nСтатус-код: {status}"
+            f"\nBuild: {self.build}"
+        )
+        raise ContainerRunError(detail=text)
+
+    def _run_command(self, command: str) -> int:
+        result: 'subprocess.CompletedProcess' = subprocess.run(
+            [command],
+            shell=True,
+            stderr=open(f'{self.path}/subprocess.log', 'a', encoding='utf-8')
+        )
+        if result.returncode:
+            logger.error(result)
+        else:
+            logger.debug(result)
+
+        return result.returncode
 
 
 def deploy_or_copy(data: dict):
@@ -116,7 +171,7 @@ def deploy_or_copy(data: dict):
     message: str = data.get("head_commit", {}).get("message", '')
     version, build = _get_version_and_build(message)
     user: str = data.get("repository", {}).get("owner", {}).get("name").lower()
-    result = Payload(**dict(
+    payload = dict(
         stage=stage,
         branch=branch,
         ssh_url=ssh_url,
@@ -124,12 +179,12 @@ def deploy_or_copy(data: dict):
         version=version,
         build=build,
         user=user
-    ))
-    logger.info(f"Result: {result}")
+    )
+    logger.info(f"Result: {payload}")
     if repository_name.endswith('_client'):
-        _create_clients_archive_files(result)
+        _create_clients_archive_files(payload=Payload(**payload))
     else:
-        result.docker_deploy()
+        Docker(**payload).deploy()
 
 
 def _get_version_and_build(message: str) -> Tuple[str, ...]:
@@ -186,4 +241,3 @@ def _create_clients_archive_files(payload: Payload) -> None:
             f"\nBuild: {payload.build}"
         )
     send_message_to_admins(text)
-

@@ -1,7 +1,7 @@
 fastapi==0.78.0
-pytest==7.1.2
+pytest-aio==1.4.1
 python-dotenv==0.20.0
 requests==2.28.0
 uvicorn==0.17.6
 
-myloguru-deskent
+myloguru-deskent==0.0.12
