@@ -36,6 +36,7 @@ class Docker(Payload):
             self._build_container()
             self._testing_container()
             self._running_container()
+            self._run_command(f'docker rmi $(docker images -q)')
         except (ContainerBuildError, ContainerTestError, ContainerRunError) as err:
             logger.exception(err)
             text = err.args[0] if err.args else err
@@ -54,7 +55,6 @@ class Docker(Payload):
             return False
         self.full_path = f'/home/{self.user}/deploy/{self.repository_name}/{self.stage}/{self.repository_name}'
         self.container = f'{self.repository_name}-{self.stage}-{self.version}'
-        self._run_command(f'docker rmi $(docker images -q)')
         return True
 
     def _clone_repository(self) -> int:
