@@ -4,7 +4,7 @@ from config import settings, logger
 
 
 def send_message_to_admins(text: str) -> int:
-    text = '[Slarti]:' + text
+    text = '[Slarti]: ' + text
     for admin in settings.ADMINS:
         url: str = f"https://api.telegram.org/bot{settings.TELEBOT_TOKEN}/sendMessage?chat_id={admin}&text={text}"
         try:
