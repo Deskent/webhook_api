@@ -10,7 +10,7 @@ from services.utils import send_message_to_admins
 from config import logger, settings
 from services.exceptions import (
     WrongVersionException, WrongBuildException, ContainerBuildError, ContainerTestError,
-    ContainerRunError
+    ContainerRunError, ContainerPrepareError
 )
 
 
@@ -30,43 +30,45 @@ class Payload(BaseModel):
 class Docker(Payload):
 
     def deploy(self) -> bool:
-        if not self._prepare():
-            return False
         try:
+            if not self._prepare():
+                return False
             self._build_container()
             self._testing_container()
             self._running_container()
-        except (ContainerBuildError, ContainerTestError, ContainerRunError) as err:
+            self._run_command(f'docker rmi $(docker images -q)')
+        except (
+                ContainerBuildError, ContainerTestError, ContainerRunError, ContainerPrepareError
+        ) as err:
             logger.exception(err)
-            text = err.args[0] if err.args else err
+            text = err.args[0] if err.args else err.detail
             send_message_to_admins(text)
             raise
         return True
 
-    def _prepare(self):
+    def _prepare(self) -> bool:
         if self.repository_name not in settings.APPLICATIONS:
             logger.warning(f'Wrong application: {self.repository_name}')
             return False
         if not self.path:
             self.path = f'/home/{self.user}/deploy/{self.repository_name}/{self.stage}'
         if not os.path.exists(self.path):
-            logger.warning(f'{self.path} does not exists.')
-            return False
-        self.full_path = f'/home/{self.user}/deploy/{self.repository_name}/{self.stage}/{self.repository_name}'
+            text = f'{self.path} does not exists.'
+            raise ContainerPrepareError(detail=text)
+        self.full_path = os.path.join(self.path, self.repository_name)
         self.container = f'{self.repository_name}-{self.stage}-{self.version}'
-        self._run_command(f'docker rmi $(docker images -q)')
         return True
 
     def _clone_repository(self) -> int:
         return self._run_command(
             f'git clone -b {self.branch} git@github.com:{self.user}/{self.repository_name}.git {self.full_path}'
-            f'&& cp {self.path}/.env {self.full_path}'
         )
 
     def _pull_repository(self) -> int:
         return self._run_command(
             f'cd {self.full_path}'
             f'&& git checkout {self.branch}'
+            f'&& cp {self.path}/.env {self.full_path}'
             f'&& git pull'
         )
 

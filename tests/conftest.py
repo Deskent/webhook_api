@@ -32,7 +32,7 @@ def repo_name() -> str:
 def payload(username, repo_name) -> dict:
     return dict(
         stage='dev',
-        branch='test',
+        branch='deskent',
         ssh_url=f'git@github.com:{username}/{repo_name}.git',
         repository_name=repo_name,
         version='test-1.0',
