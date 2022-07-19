@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     SERVER_HOST: str = '127.0.0.1'
     SERVER_PORT: int = 8000
     DEBUG: bool = False
-    ADMINS: list = []
+    ADMINS: list
     TELEBOT_TOKEN: str
     STAGE: str
     STAGES: dict
