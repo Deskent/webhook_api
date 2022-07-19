@@ -159,8 +159,8 @@ class Docker(Payload):
 def deploy_or_copy(data: dict):
     logger.info(f'Data: {data}')
     branch: str = data.get("ref", '').split('/')[-1]
-    if branch != settings.STAGES.keys():
-        logger.warning(f'Wrong branch: {branch}, \nStages: {settings.STAGES.keys()}')
+    if branch not in settings.STAGES.keys():
+        logger.warning(f'Wrong branch: {branch}, \tStages: {settings.STAGES.keys()}')
         return
     stage: str = settings.STAGES[branch]
     ssh_url: str = data.get("repository", {}).get("ssh_url", '')
