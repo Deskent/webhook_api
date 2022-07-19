@@ -92,9 +92,7 @@ class Docker(Payload):
         status: int = self._run_command(
             f'cd {self.full_path}'
             f'&& git checkout {self.branch}'
-            f'&& export VERSION="{self.stage}-{self.version}"'
-            f'&& export APPNAME="{self.repository_name}"'
-            f'&& docker build . -t {self.repository_name}:{self.stage}-{self.version}'
+            f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name}" docker-compose build'
         )
         if status == 0:
             text = f"Контейнер {self.container} собран.\nBuild: {self.build}"
@@ -112,9 +110,7 @@ class Docker(Payload):
         status = self._run_command(
             f'cd {self.full_path}'
             f'&& git checkout {self.branch}'
-            f'&& export VERSION="{self.stage}-{self.version}"'
-            f'&& export APPNAME="{self.repository_name}"'
-            f'&& docker-compose run --rm app pytest -s -v -k server tests/'
+            f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name}" docker-compose run --rm app pytest -s -v -k server tests/'
         )
         if status == 0:
             text = f"Контейнер {self.container} протестирован.\nBuild: {self.build}"
@@ -131,10 +127,8 @@ class Docker(Payload):
         logger.info(f"Starting container: {self.container}")
         status: int = self._run_command(
             f'cd {self.full_path}'
-            f'&& export VERSION="{self.stage}-{self.version}"'
-            f'&& export APPNAME="{self.repository_name}"'
             f'&& docker-compose down --remove-orphans'
-            f'&& docker-compose up -d'
+            f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name}" docker-compose up -d'
             f'&& echo --- Done'
         )
         if status == 0:
