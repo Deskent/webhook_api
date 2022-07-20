@@ -94,6 +94,12 @@ class Docker(Payload):
             f'&& git checkout {self.branch}'
             f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name}" docker-compose build'
         )
+        if status:
+            status: int = self._run_command(
+                f'cd {self.full_path}'
+                f'&& git checkout {self.branch}'
+                f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name}" docker-compose build'
+            )
         if status == 0:
             text = f"Контейнер {self.container} собран.\nBuild: {self.build}"
             send_message_to_admins(text)
