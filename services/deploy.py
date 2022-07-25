@@ -89,17 +89,15 @@ class Docker(Payload):
             )
             send_message_to_admins(text)
             raise ContainerBuildError(detail=text)
-        status: int = self._run_command(
-            f'cd {self.full_path}'
-            f'&& git checkout {self.branch}'
-            f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name}" docker-compose build'
-        )
-        if status:
+        status = -1
+        for _ in range(2):
             status: int = self._run_command(
                 f'cd {self.full_path}'
                 f'&& git checkout {self.branch}'
-                f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name}" docker-compose build'
+                f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose build'
             )
+            if not status:
+                break
         if status == 0:
             text = f"Контейнер {self.container} собран.\nBuild: {self.build}"
             send_message_to_admins(text)
@@ -116,7 +114,7 @@ class Docker(Payload):
         status = self._run_command(
             f'cd {self.full_path}'
             f'&& git checkout {self.branch}'
-            f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name}" docker-compose run --rm app pytest -s -v -k server tests/'
+            f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose run --rm app pytest -s -v -k server tests/'
         )
         if status == 0:
             text = f"Контейнер {self.container} протестирован.\nBuild: {self.build}"
@@ -134,7 +132,7 @@ class Docker(Payload):
         status: int = self._run_command(
             f'cd {self.full_path}'
             f'&& docker-compose down --remove-orphans'
-            f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name}" docker-compose up -d'
+            f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose up -d'
             f'&& echo --- Done'
         )
         if status == 0:
