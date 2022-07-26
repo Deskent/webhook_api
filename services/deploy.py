@@ -63,36 +63,25 @@ class Docker(Payload):
         self.report += 'Prepare: OK'
         return True
 
-    def _clone_repository(self) -> int:
-        return self._run_command(
+    def _clone_repository(self) -> None:
+        if self._run_command(
             f'git clone -b {self.branch} git@github.com:{self.user}/{self.repository_name}.git {self.full_path}'
-        )
+        ):
+            text = (
+                f"\nОшибка клонирования {self.container}"
+                f"\nBuild: {self.build}"
+            )
+            self.report += text
+            raise ContainerBuildError(detail=text)
 
-    def _pull_repository(self) -> int:
-        return self._run_command(
+        self.report += '\nКлонирование: ОК'
+
+    def _pull_repository(self) -> None:
+        if self._run_command(
             f'cd {self.full_path}'
             f'&& git checkout {self.branch}'
-            f'&& cp {self.path}/.env {self.full_path}'
             f'&& git pull'
-        )
-
-    def _copy_env(self) -> int:
-        return self._run_command(
-            f'cp {self.path}/.env {self.full_path}'
-        )
-
-    def _build_container(self) -> int:
-        logger.info(f"Start building container: {self.container}")
-        if not os.path.exists(self.full_path):
-            if self._clone_repository():
-                text = (
-                    f"\nОшибка клонирования {self.container}"
-                    f"\nBuild: {self.build}"
-                )
-                self.report += text
-                raise ContainerBuildError(detail=text)
-        self.report += '\nКлонирование: ОК'
-        if self._pull_repository():
+        ):
             text = (
                 f"\nОшибка пулла: {self.container}"
                 f"\nBuild: {self.build}"
@@ -100,7 +89,11 @@ class Docker(Payload):
             self.report += text
             raise ContainerBuildError(detail=text)
         self.report += '\nПулл: ОК'
-        if self._copy_env():
+
+    def _copy_env(self) -> None:
+        if self._run_command(
+            f'cp {self.path}/.env {self.full_path}'
+        ):
             text = (
                 f"\nОшибка копирования .env файла: {self.container}"
                 f"\nBuild: {self.build}"
@@ -108,6 +101,14 @@ class Docker(Payload):
             self.report += text
             raise ContainerBuildError(detail=text)
         self.report += '\nКопирование: ОК'
+
+    def _build_container(self) -> int:
+        logger.info(f"Start building container: {self.container}")
+        if not os.path.exists(self.full_path):
+            self._clone_repository()
+        self._copy_env()
+        self._pull_repository()
+
         status = -1
         for _ in range(2):
             status: int = self._run_command(
