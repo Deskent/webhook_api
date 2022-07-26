@@ -169,8 +169,7 @@ class Docker(Payload):
         result: 'subprocess.CompletedProcess' = subprocess.run(
             [command],
             shell=True,
-            stderr=open(f'{self.path}/subprocess.log', 'a', encoding='utf-8'),
-            stdout=subprocess.STDOUT
+            stderr=open(f'{self.path}/subprocess.log', 'a', encoding='utf-8')
         )
         if result.returncode:
             logger.error(result)
