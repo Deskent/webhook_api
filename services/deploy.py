@@ -60,7 +60,12 @@ class Docker(Payload):
             raise ContainerPrepareError(detail=text)
         self.full_path = os.path.join(self.path, self.repository_name)
         self.container = f'{self.repository_name}-{self.stage}-{self.version}'
-        self.report += f'\nContainer: {self.container}\nBuild: {self.build}\nPrepare: OK'
+        self.report += (
+            f'\nContainer: {self.container}'
+            f'\n[build:{self.build}]'
+            f'\n[version:{self.version}]'
+            f'\n\nPrepare: OK'
+        )
         return True
 
     def _clone_repository(self) -> None:
@@ -110,7 +115,7 @@ class Docker(Payload):
             if not status:
                 break
         if status == 0:
-            self.report += f"\nСборка: ОК\n"
+            self.report += f"\nСборка: ОК"
             return status
 
         text = "\nОшибка сборки"
