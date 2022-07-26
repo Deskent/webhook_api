@@ -78,7 +78,7 @@ class Docker(Payload):
 
     def _copy_env(self) -> int:
         return self._run_command(
-            f'&& cp {self.path}/.env {self.full_path}'
+            f'cp {self.path}/.env {self.full_path}'
         )
 
     def _build_container(self) -> int:
@@ -169,7 +169,8 @@ class Docker(Payload):
         result: 'subprocess.CompletedProcess' = subprocess.run(
             [command],
             shell=True,
-            stderr=open(f'{self.path}/subprocess.log', 'a', encoding='utf-8')
+            stderr=open(f'{self.path}/subprocess.log', 'a', encoding='utf-8'),
+            stdout=subprocess.STDOUT
         )
         if result.returncode:
             logger.error(result)
