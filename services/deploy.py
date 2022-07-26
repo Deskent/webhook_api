@@ -60,17 +60,14 @@ class Docker(Payload):
             raise ContainerPrepareError(detail=text)
         self.full_path = os.path.join(self.path, self.repository_name)
         self.container = f'{self.repository_name}-{self.stage}-{self.version}'
-        self.report += 'Prepare: OK'
+        self.report += f'\nContainer: {self.container}\nBuild: {self.build}\nPrepare: OK'
         return True
 
     def _clone_repository(self) -> None:
         if self._run_command(
             f'git clone -b {self.branch} git@github.com:{self.user}/{self.repository_name}.git {self.full_path}'
         ):
-            text = (
-                f"\nОшибка клонирования {self.container}"
-                f"\nBuild: {self.build}"
-            )
+            text = "\nОшибка клонирования"
             self.report += text
             raise ContainerBuildError(detail=text)
 
@@ -82,10 +79,7 @@ class Docker(Payload):
             f'&& git checkout {self.branch}'
             f'&& git pull'
         ):
-            text = (
-                f"\nОшибка пулла: {self.container}"
-                f"\nBuild: {self.build}"
-            )
+            text = f"\nОшибка пулла"
             self.report += text
             raise ContainerBuildError(detail=text)
         self.report += '\nПулл: ОК'
@@ -94,10 +88,7 @@ class Docker(Payload):
         if self._run_command(
             f'cp {self.path}/.env {self.full_path}'
         ):
-            text = (
-                f"\nОшибка копирования .env файла: {self.container}"
-                f"\nBuild: {self.build}"
-            )
+            text = "\nОшибка копирования .env файла"
             self.report += text
             raise ContainerBuildError(detail=text)
         self.report += '\nКопирование: ОК'
@@ -119,13 +110,10 @@ class Docker(Payload):
             if not status:
                 break
         if status == 0:
-            self.report += f"\nСборка: ОК\n{self.container}\nBuild: {self.build}"
+            self.report += f"\nСборка: ОК\n"
             return status
 
-        text = (
-            f"\nОшибка сборки контейнера {self.container}."
-            f"\nBuild: {self.build}"
-        )
+        text = "\nОшибка сборки"
         self.report += text
         raise ContainerBuildError(detail=text)
 
@@ -137,13 +125,10 @@ class Docker(Payload):
             f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose run --rm app pytest -s -v -k server tests/'
         )
         if status == 0:
-            self.report += f"\nТесты: ОК\n{self.container}\nBuild: {self.build}"
+            self.report += "\nТесты: ОК"
             return status
 
-        text = (
-            f"\nОшибка тестирования контейнера {self.container}."
-            f"\nBuild: {self.build}"
-        )
+        text = "\nОшибка тестирования"
         self.report += text
         raise ContainerTestError(detail=text)
 
@@ -156,13 +141,9 @@ class Docker(Payload):
             f'&& echo --- Done'
         )
         if status == 0:
-            self.report += f"\nРазвертывание: ОК\n{self.container}\nBuild: {self.build}"
+            self.report += f"\nРазвертывание: ОК"
             return status
-        text = (
-            f"\nОшибка развертывания {self.container}."
-            f"\nСтатус-код: {status}"
-            f"\nBuild: {self.build}"
-        )
+        text = "\nОшибка развертывания"
         self.report += text
         raise ContainerRunError(detail=text)
 
