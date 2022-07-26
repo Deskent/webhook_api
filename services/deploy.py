@@ -25,6 +25,7 @@ class Payload(BaseModel):
     path: str = ''
     full_path: str = ''
     container: str = ''
+    report: str = ''
 
 
 class Docker(Payload):
@@ -37,12 +38,13 @@ class Docker(Payload):
             self._testing_container()
             self._running_container()
             self._run_command(f'docker rmi $(docker images -q)')
+            send_message_to_admins(self.report)
         except (
                 ContainerBuildError, ContainerTestError, ContainerRunError, ContainerPrepareError
         ) as err:
-            logger.exception(err)
             text = err.args[0] if err.args else err.detail
-            send_message_to_admins(text)
+            logger.exception(f"{text}: {err}")
+            send_message_to_admins(self.report)
             raise
         return True
 
@@ -53,10 +55,12 @@ class Docker(Payload):
         if not self.path:
             self.path = f'/home/{self.user}/deploy/{self.repository_name}/{self.stage}'
         if not os.path.exists(self.path):
-            text = f'{self.path} does not exists.'
+            text = f'\n{self.path} does not exists.'
+            self.report += text
             raise ContainerPrepareError(detail=text)
         self.full_path = os.path.join(self.path, self.repository_name)
         self.container = f'{self.repository_name}-{self.stage}-{self.version}'
+        self.report += 'Prepare: OK'
         return True
 
     def _clone_repository(self) -> int:
@@ -72,23 +76,38 @@ class Docker(Payload):
             f'&& git pull'
         )
 
+    def _copy_env(self) -> int:
+        return self._run_command(
+            f'&& cp {self.path}/.env {self.full_path}'
+        )
+
     def _build_container(self) -> int:
         logger.info(f"Start building container: {self.container}")
         if not os.path.exists(self.full_path):
             if self._clone_repository():
                 text = (
-                    f"Ошибка клонирования {self.container}"
+                    f"\nОшибка клонирования {self.container}"
                     f"\nBuild: {self.build}"
                 )
-                send_message_to_admins(text)
+                self.report += text
                 raise ContainerBuildError(detail=text)
+        self.report += '\nКлонирование: ОК'
         if self._pull_repository():
             text = (
-                f"Ошибка пулла: {self.container}"
+                f"\nОшибка пулла: {self.container}"
                 f"\nBuild: {self.build}"
             )
-            send_message_to_admins(text)
+            self.report += text
             raise ContainerBuildError(detail=text)
+        self.report += '\nПулл: ОК'
+        if self._copy_env():
+            text = (
+                f"\nОшибка копирования .env файла: {self.container}"
+                f"\nBuild: {self.build}"
+            )
+            self.report += text
+            raise ContainerBuildError(detail=text)
+        self.report += '\nКопирование: ОК'
         status = -1
         for _ in range(2):
             status: int = self._run_command(
@@ -99,14 +118,14 @@ class Docker(Payload):
             if not status:
                 break
         if status == 0:
-            text = f"Контейнер {self.container} собран.\nBuild: {self.build}"
-            send_message_to_admins(text)
+            self.report += f"\nСборка: ОК\n{self.container}\nBuild: {self.build}"
             return status
 
         text = (
-            f"Ошибка сборки контейнера {self.container}."
+            f"\nОшибка сборки контейнера {self.container}."
             f"\nBuild: {self.build}"
         )
+        self.report += text
         raise ContainerBuildError(detail=text)
 
     def _testing_container(self):
@@ -117,14 +136,14 @@ class Docker(Payload):
             f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose run --rm app pytest -s -v -k server tests/'
         )
         if status == 0:
-            text = f"Контейнер {self.container} протестирован.\nBuild: {self.build}"
-            send_message_to_admins(text)
+            self.report += f"\nТесты: ОК\n{self.container}\nBuild: {self.build}"
             return status
 
         text = (
-            f"Ошибка тестирования контейнера {self.container}."
+            f"\nОшибка тестирования контейнера {self.container}."
             f"\nBuild: {self.build}"
         )
+        self.report += text
         raise ContainerTestError(detail=text)
 
     def _running_container(self):
@@ -136,14 +155,14 @@ class Docker(Payload):
             f'&& echo --- Done'
         )
         if status == 0:
-            text = f"Контейнер {self.container} развернут.\nBuild: {self.build}"
-            send_message_to_admins(text)
+            self.report += f"\nРазвертывание: ОК\n{self.container}\nBuild: {self.build}"
             return status
         text = (
-            f"Ошибка развертывания {self.container}."
+            f"\nОшибка развертывания {self.container}."
             f"\nСтатус-код: {status}"
             f"\nBuild: {self.build}"
         )
+        self.report += text
         raise ContainerRunError(detail=text)
 
     def _run_command(self, command: str) -> int:

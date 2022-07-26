@@ -1,4 +1,4 @@
-__build__ = '1.1.21'
+__build__ = '1.1.22'
 __version__ = '1.1'
 __author__ = 'Deskent'
 __appname__ = "Webhook API"
