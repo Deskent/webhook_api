@@ -172,16 +172,15 @@ def action_report(data: dict) -> None:
     version, build = _get_version_and_build(message)
     conclusion: str = data.get("workflow_run", {}).get("conclusion")
     text = (
-        f"PYPI: {repository_name}"
-        f"[build:{build}]"
-        f"[version:{version}]"
-        f"Result: {conclusion}"
+        f"\nPYPI: {repository_name}"
+        f"\n[build:{build}]"
+        f"\n[version:{version}]"
+        f"\nResult: {conclusion}"
     )
     send_message_to_admins(text)
 
 
 def deploy_or_copy(data: dict) -> None:
-    logger.info(f'Data: {data}')
     branch: str = data.get("ref", '').split('/')[-1]
     if branch not in settings.STAGES.keys():
         logger.warning(f'Wrong branch: {branch}')
