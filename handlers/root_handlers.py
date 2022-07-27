@@ -5,7 +5,7 @@ import json
 from fastapi import APIRouter, Request, Header, Response, status
 
 from config import logger, settings
-from services.deploy import deploy_or_copy
+from services.deploy import deploy_or_copy, action_report
 
 
 root_router = APIRouter()
@@ -35,10 +35,7 @@ async def deploy(
         x_github_event: str = Header(None),
         content_length: int = Header(...)
 ):
-    if x_github_event == 'workflow_run':
-        logger.info(await request.json())
-        return {"result": "workflow_run ok"}
-    if x_github_event != 'push':
+    if x_github_event not in  ('push', 'workflow_run'):
         logger.error(f"Wrong event: {x_github_event}")
         response.status_code = 400
         return {"result": "Event wrong"}
@@ -56,7 +53,10 @@ async def deploy(
         return {"result": "Wrong content"}
     try:
         data: dict = await request.json()
-        deploy_or_copy(data)
+        if data.get('action') == 'completed':
+            action_report(data)
+        else:
+            deploy_or_copy(data)
     except json.decoder.JSONDecodeError as err:
         logger.error(err)
         return {"result": "json error"}
