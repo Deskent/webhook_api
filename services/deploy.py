@@ -166,11 +166,25 @@ class Docker(Payload):
         return result.returncode
 
 
-def deploy_or_copy(data: dict):
+def action_report(data: dict) -> None:
+    repository_name: str = data.get("workflow_run", {}).get("repository", {}).get("name")
+    message: str = data.get("workflow_run", {}).get("head_commit", {}).get("message", '')
+    version, build = _get_version_and_build(message)
+    conclusion: str = data.get("workflow_run", {}).get("conclusion")
+    text = (
+        f"PYPI: {repository_name}"
+        f"[build:{build}]"
+        f"[version:{version}]"
+        f"Result: {conclusion}"
+    )
+    send_message_to_admins(text)
+
+
+def deploy_or_copy(data: dict) -> None:
     logger.info(f'Data: {data}')
     branch: str = data.get("ref", '').split('/')[-1]
     if branch not in settings.STAGES.keys():
-        logger.warning(f'Wrong branch: {branch}, \tStages: {settings.STAGES.keys()}')
+        logger.warning(f'Wrong branch: {branch}')
         return
     stage: str = settings.STAGES[branch]
     ssh_url: str = data.get("repository", {}).get("ssh_url", '')
@@ -189,9 +203,8 @@ def deploy_or_copy(data: dict):
     )
     logger.info(f"Result: {payload}")
     if repository_name.endswith('_client'):
-        _create_clients_archive_files(payload=Payload(**payload))
-    else:
-        Docker(**payload).deploy()
+        return _create_clients_archive_files(payload=Payload(**payload))
+    Docker(**payload).deploy()
 
 
 def _get_version_and_build(message: str) -> Tuple[str, ...]:
