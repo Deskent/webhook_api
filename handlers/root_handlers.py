@@ -35,6 +35,9 @@ async def deploy(
         x_github_event: str = Header(None),
         content_length: int = Header(...)
 ):
+    if x_github_event == 'workflow_run':
+        logger.info(await request.json())
+        return {"result": "workflow_run ok"}
     if x_github_event != 'push':
         logger.error(f"Wrong event: {x_github_event}")
         response.status_code = 400
