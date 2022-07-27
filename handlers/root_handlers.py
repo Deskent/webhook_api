@@ -35,7 +35,7 @@ async def deploy(
         x_github_event: str = Header(None),
         content_length: int = Header(...)
 ):
-    if x_github_event not in  ('push', 'workflow_run'):
+    if x_github_event not in ('push', 'workflow_run'):
         logger.error(f"Wrong event: {x_github_event}")
         response.status_code = 400
         return {"result": "Event wrong"}
@@ -53,6 +53,7 @@ async def deploy(
         return {"result": "Wrong content"}
     try:
         data: dict = await request.json()
+        logger.info(f'Data: {data}')
         if data.get('action') == 'completed':
             action_report(data)
         else:
