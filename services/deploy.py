@@ -127,7 +127,7 @@ class Docker(Payload):
         status = self._run_command(
             f'cd {self.full_path}'
             f'&& git checkout {self.branch}'
-            f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose run --rm app pytest -s -v -k server tests/'
+            f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose run --rm app pytest -k server tests/'
         )
         if status == 0:
             self.report += "\nТесты: ОК"
