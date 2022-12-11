@@ -45,6 +45,7 @@ async def check_hook(
     #     logger.error(f"Wrong content: {x_hub_signature_256}")
     #     response.status_code = 400
     #     return {"result": "Wrong content"}
+    # FIXED add /
     pass
 
 
