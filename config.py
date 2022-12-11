@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import BaseSettings
 
 from myloguru.my_loguru import get_logger
@@ -16,6 +18,7 @@ class Settings(BaseSettings):
     GITHUB_SECRET: str
     LOCATION: str
 
+BASE_DIR = Path(__file__)
 settings = Settings(
     _env_file='.env',
     _env_file_encoding='utf-8'
