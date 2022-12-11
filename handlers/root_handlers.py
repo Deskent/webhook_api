@@ -29,22 +29,23 @@ async def check_hook(
         x_github_event: str = Header(None),
         content_length: int = Header(...)
 ):
-    if x_github_event not in ('push', 'workflow_run'):
-        logger.error(f"Wrong event: {x_github_event}")
-        response.status_code = 400
-        return {"result": "Event wrong"}
-    if content_length > 1_000_000:
-        logger.error(f"Content too long: {content_length}")
-        response.status_code = 400
-        return {"result": "Content too long"}
-    if not user_agent.startswith('GitHub-Hookshot/'):
-        logger.error(f"User agent FAIL: {user_agent}")
-        response.status_code = 400
-        return {"result": "User agent fail"}
-    if not validate_signature(header=x_hub_signature_256, body=await request.body()):
-        logger.error(f"Wrong content: {x_hub_signature_256}")
-        response.status_code = 400
-        return {"result": "Wrong content"}
+    # if x_github_event not in ('push', 'workflow_run'):
+    #     logger.error(f"Wrong event: {x_github_event}")
+    #     response.status_code = 400
+    #     return {"result": "Event wrong"}
+    # if content_length > 1_000_000:
+    #     logger.error(f"Content too long: {content_length}")
+    #     response.status_code = 400
+    #     return {"result": "Content too long"}
+    # if not user_agent.startswith('GitHub-Hookshot/'):
+    #     logger.error(f"User agent FAIL: {user_agent}")
+    #     response.status_code = 400
+    #     return {"result": "User agent fail"}
+    # if not validate_signature(header=x_hub_signature_256, body=await request.body()):
+    #     logger.error(f"Wrong content: {x_hub_signature_256}")
+    #     response.status_code = 400
+    #     return {"result": "Wrong content"}
+    pass
 
 
 @root_router.get('/', tags=['root'])
