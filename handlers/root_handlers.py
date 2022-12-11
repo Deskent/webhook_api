@@ -2,10 +2,10 @@ import hmac
 import hashlib
 import json
 
-from fastapi import APIRouter, Request, Header, Response, status
+from fastapi import APIRouter, Request, Header, Response, status, Depends
 
-from config import logger, settings
-from services.deploy import deploy_or_copy, action_report
+from config import logger, settings, BASE_DIR
+from services.deploy import deploy_or_copy, action_report, GitPull
 
 
 root_router = APIRouter()
@@ -21,13 +21,7 @@ def validate_signature(header, body):
     return hmac.compare_digest(secret_signature, github_signature)
 
 
-@root_router.get('/', tags=['root'])
-def root():
-    return {"root": "OKidoki"}
-
-
-@root_router.post('/', status_code=status.HTTP_200_OK, tags=['deploy'])
-async def deploy(
+async def check_hook(
         request: Request,
         response: Response,
         x_hub_signature_256: str = Header(None),
@@ -51,6 +45,42 @@ async def deploy(
         logger.error(f"Wrong content: {x_hub_signature_256}")
         response.status_code = 400
         return {"result": "Wrong content"}
+
+
+@root_router.get('/', tags=['root'])
+def root():
+    return {"root": "OKidoki"}
+
+
+@root_router.get('/update', tags=['update'], status_code=status.HTTP_200_OK)
+async def update(
+        request: Request,
+        is_hook_not_valid: dict = Depends(check_hook)
+):
+    if is_hook_not_valid:
+        return is_hook_not_valid
+
+    data: dict = await request.json()
+    logger.debug(data)
+    # git_pull = GitPull()
+    # try:
+    #     logger.info(f'Data: {data}')
+    #     if data.get('action') == 'completed':
+    #         action_report(data)
+    #     else:
+    #         deploy_or_copy(data)
+    # except json.decoder.JSONDecodeError as err:
+    #     logger.error(err)
+    #     return {"result": "json error"}
+    # return {"result": "ok"}
+
+@root_router.post('/', status_code=status.HTTP_200_OK, tags=['deploy'])
+async def deploy(
+        request: Request,
+        hook_is_not_valid: dict = Depends(check_hook)
+):
+    if hook_is_not_valid:
+        return hook_is_not_valid
     try:
         data: dict = await request.json()
         logger.info(f'Data: {data}')
@@ -62,3 +92,5 @@ async def deploy(
         logger.error(err)
         return {"result": "json error"}
     return {"result": "ok"}
+
+

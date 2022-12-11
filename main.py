@@ -13,7 +13,7 @@ def get_application() -> FastAPI:
     send_message_to_admins(f"{__appname__.title()} started."
                            f"\nBuild:[{__build__}]"
                            f"\nVersion:[{__version__}]"
-                           f"Location: [{settings.LOCATION}]"
+                           f"\nLocation: [{settings.LOCATION}]"
     )
     application = FastAPI()
     application.include_router(api_router)

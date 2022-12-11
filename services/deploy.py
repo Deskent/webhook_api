@@ -13,19 +13,64 @@ from services.exceptions import (
     ContainerRunError, ContainerPrepareError
 )
 
+class CommandExecutor(BaseModel):
+    path: str = None
 
-class Payload(BaseModel):
+    def run_command(self, command: str, path: str = None) -> int:
+        if not path:
+            path = self.path
+        result: 'subprocess.CompletedProcess' = subprocess.run(
+            [command],
+            shell=True,
+            stderr=open(f'{path}/subprocess.log', 'a', encoding='utf-8')
+        )
+        if result.returncode:
+            logger.error(result)
+        else:
+            logger.debug(result)
+
+        return result.returncode
+
+
+class GitPull(CommandExecutor):
     branch: str
-    stage: str
     repository_name: str
+    user: str
+    report: str = ''
+    full_path: str = ''
+
+    def clone_repository(self) -> None:
+        if self.run_command(
+                f'git clone -b {self.branch} git@github.com:{self.user}/{self.repository_name}.git {self.full_path}'
+        ):
+            text = "\nОшибка клонирования"
+            self.report += text
+            raise ContainerBuildError(detail=text)
+
+        self.report += '\nКлонирование: ОК'
+
+    def pull_repository(self, full_path: str = None, branch: str = '') -> None:
+        if not full_path:
+            full_path = self.full_path
+        if not branch:
+            branch = self.branch
+        if self.run_command(
+                f'cd {full_path}'
+                f'&& git checkout {branch}'
+                f'&& git pull'
+        ):
+            text = f"\nОшибка пулла"
+            self.report += text
+            raise ContainerBuildError(detail=text)
+        self.report += '\nПулл: ОК'
+
+
+class Payload(GitPull):
+    stage: str
     version: str
     build: str
-    user: str
     ssh_url: str
-    path: str = ''
-    full_path: str = ''
     container: str = ''
-    report: str = ''
 
 
 class Docker(Payload):
@@ -37,7 +82,7 @@ class Docker(Payload):
             self._build_container()
             self._testing_container()
             self._running_container()
-            self._run_command(f'docker rmi $(docker images -q)')
+            self.run_command(f'docker rmi $(docker images -q)')
             send_message_to_admins(self.report)
         except (
                 ContainerBuildError, ContainerTestError, ContainerRunError, ContainerPrepareError
@@ -68,29 +113,8 @@ class Docker(Payload):
         )
         return True
 
-    def _clone_repository(self) -> None:
-        if self._run_command(
-            f'git clone -b {self.branch} git@github.com:{self.user}/{self.repository_name}.git {self.full_path}'
-        ):
-            text = "\nОшибка клонирования"
-            self.report += text
-            raise ContainerBuildError(detail=text)
-
-        self.report += '\nКлонирование: ОК'
-
-    def _pull_repository(self) -> None:
-        if self._run_command(
-            f'cd {self.full_path}'
-            f'&& git checkout {self.branch}'
-            f'&& git pull'
-        ):
-            text = f"\nОшибка пулла"
-            self.report += text
-            raise ContainerBuildError(detail=text)
-        self.report += '\nПулл: ОК'
-
     def _copy_env(self) -> None:
-        if self._run_command(
+        if self.run_command(
             f'cp {self.path}/.env {self.full_path}'
         ):
             text = "\nОшибка копирования .env файла"
@@ -101,13 +125,13 @@ class Docker(Payload):
     def _build_container(self) -> int:
         logger.info(f"Start building container: {self.container}")
         if not os.path.exists(self.full_path):
-            self._clone_repository()
+            self.clone_repository()
         self._copy_env()
-        self._pull_repository()
+        self.pull_repository()
 
         status = -1
         for _ in range(2):
-            status: int = self._run_command(
+            status: int = self.run_command(
                 f'cd {self.full_path}'
                 f'&& git checkout {self.branch}'
                 f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose build'
@@ -124,7 +148,7 @@ class Docker(Payload):
 
     def _testing_container(self):
         logger.info(f"Start testing container: {self.container}")
-        status = self._run_command(
+        status = self.run_command(
             f'cd {self.full_path}'
             f'&& git checkout {self.branch}'
             f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose run --rm app pytest -k server tests/'
@@ -139,7 +163,7 @@ class Docker(Payload):
 
     def _running_container(self):
         logger.info(f"Starting container: {self.container}")
-        status: int = self._run_command(
+        status: int = self.run_command(
             f'cd {self.full_path}'
             f'&& docker-compose down --remove-orphans'
             f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose up -d'
@@ -151,19 +175,6 @@ class Docker(Payload):
         text = "\nОшибка развертывания"
         self.report += text
         raise ContainerRunError(detail=text)
-
-    def _run_command(self, command: str) -> int:
-        result: 'subprocess.CompletedProcess' = subprocess.run(
-            [command],
-            shell=True,
-            stderr=open(f'{self.path}/subprocess.log', 'a', encoding='utf-8')
-        )
-        if result.returncode:
-            logger.error(result)
-        else:
-            logger.debug(result)
-
-        return result.returncode
 
 
 def action_report(data: dict) -> None:

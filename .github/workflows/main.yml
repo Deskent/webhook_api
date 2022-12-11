@@ -4,7 +4,7 @@ env:
   STAGE: "main"
 on:
   push:
-    branches: [ main ]
+    branches: [ main1 ]
 jobs:
   deploy_superpomerashki:
     runs-on: ubuntu-latest
