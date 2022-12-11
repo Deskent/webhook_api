@@ -208,7 +208,7 @@ def update_repository(data: dict) -> None:
         full_path=str(BASE_DIR),
         report=f"Git pull for {repository['name']}"
     )
-    git_pull.clone_repository()
+    git_pull.pull_repository()
 
 
 def deploy_or_copy(data: dict) -> None:
