@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     LOCATION: str
     UPDATE: list = []
 
-BASE_DIR = Path(__file__)
+BASE_DIR = Path(__file__).parent
 settings = Settings(
     _env_file='.env',
     _env_file_encoding='utf-8'
