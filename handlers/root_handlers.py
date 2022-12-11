@@ -64,7 +64,7 @@ async def deploy(
         data: dict = await request.json()
         data_str = '\n'.join(f"{k}: {v}" for k, v in data.items())
         logger.debug(f"Data: \n{data_str}")
-        if ['name'] in settings.UPDATE:
+        if data['repository']['name'] in settings.UPDATE:
             update_repository(data)
         elif data.get('action') == 'completed':
             action_report(data)
