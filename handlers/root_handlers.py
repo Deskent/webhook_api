@@ -1,11 +1,11 @@
-import hmac
 import hashlib
+import hmac
 import json
 
 from fastapi import APIRouter, Request, Header, Response, status, Depends
 
-from config import logger, settings, BASE_DIR
-from services.deploy import deploy_or_copy, action_report, GitPull
+from config import logger, settings
+from services.deploy import deploy_or_copy, action_report, update_repository
 
 
 root_router = APIRouter()
@@ -64,7 +64,9 @@ async def deploy(
         data: dict = await request.json()
         data_str = '\n'.join(f"{k}: {v}" for k, v in data.items())
         logger.debug(f"Data: \n{data_str}")
-        if data.get('action') == 'completed':
+        if ['name'] in settings.UPDATE:
+            update_repository(data)
+        elif data.get('action') == 'completed':
             action_report(data)
         else:
             deploy_or_copy(data)
