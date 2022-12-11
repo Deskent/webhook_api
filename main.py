@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 
 from routers import api_router
-from database import db_connect
 from config import logger, settings
 from services.utils import send_message_to_admins
 from _resources import __version__, __appname__, __build__
@@ -17,7 +16,6 @@ def get_application() -> FastAPI:
                            f"Location: [{settings.LOCATION}]"
     )
     application = FastAPI()
-    db_connect(application)
     application.include_router(api_router)
 
     return application
