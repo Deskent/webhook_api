@@ -201,11 +201,12 @@ def update_repository(data: dict) -> None:
         return
     repository = data['repository']
     git_pull = GitPull(
+        path=str(BASE_DIR),
         branch=branch,
         repository_name=repository['name'],
         user=repository['owner']['name'],
         full_path=str(BASE_DIR),
-        report=f"Git pull for {repository['name']: \n}"
+        report=f"Git pull for {repository['name']}"
     )
     git_pull.clone_repository()
 
