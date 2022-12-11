@@ -56,10 +56,10 @@ def root():
 @root_router.post('/', status_code=status.HTTP_200_OK, tags=['deploy'])
 async def deploy(
         request: Request,
-        hook_is_not_valid: dict = Depends(check_hook)
+        # hook_is_not_valid: dict = Depends(check_hook)
 ):
-    if hook_is_not_valid:
-        return hook_is_not_valid
+    # if hook_is_not_valid:
+    #     return hook_is_not_valid
     try:
         data: dict = await request.json()
         logger.info(f'Data: {data}')
