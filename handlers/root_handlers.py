@@ -52,28 +52,6 @@ def root():
     return {"root": "OKidoki"}
 
 
-@root_router.get('/update', tags=['update'], status_code=status.HTTP_200_OK)
-async def update(
-        request: Request,
-        is_hook_not_valid: dict = Depends(check_hook)
-):
-    if is_hook_not_valid:
-        return is_hook_not_valid
-
-    data: dict = await request.json()
-    logger.debug(data)
-    # git_pull = GitPull()
-    # try:
-    #     logger.info(f'Data: {data}')
-    #     if data.get('action') == 'completed':
-    #         action_report(data)
-    #     else:
-    #         deploy_or_copy(data)
-    # except json.decoder.JSONDecodeError as err:
-    #     logger.error(err)
-    #     return {"result": "json error"}
-    # return {"result": "ok"}
-
 @root_router.post('/', status_code=status.HTTP_200_OK, tags=['deploy'])
 async def deploy(
         request: Request,
