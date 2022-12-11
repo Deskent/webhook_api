@@ -51,7 +51,7 @@ class GitPull(CommandExecutor):
 
     def pull_repository(self) -> None:
         if self.run_command(
-                f'cd {self.full_path}'
+                f'cd {self.full_path} '
                 f'&& git checkout {self.branch}'
                 f'&& git pull'
         ):
@@ -128,7 +128,7 @@ class Docker(Payload):
         status = -1
         for _ in range(2):
             status: int = self.run_command(
-                f'cd {self.full_path}'
+                f'cd {self.full_path} '
                 f'&& git checkout {self.branch}'
                 f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose build'
             )
@@ -140,12 +140,13 @@ class Docker(Payload):
 
         text = "\nОшибка сборки"
         self.report += text
+        logger.debug(f"Docker data: \n{self.dict()}")
         raise ContainerBuildError(detail=text)
 
     def _testing_container(self):
         logger.info(f"Start testing container: {self.container}")
         status = self.run_command(
-            f'cd {self.full_path}'
+            f'cd {self.full_path} '
             f'&& git checkout {self.branch}'
             f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose run --rm app pytest -k server tests/'
         )
@@ -232,7 +233,7 @@ def deploy_or_copy(data: dict) -> None:
     )
     logger.info(f"Result: {payload}")
     if repository_name.endswith('_client'):
-        return _create_clients_archive_files(payload=Payload(**payload))
+        return _create_clients_archive_files(payload=Docker(**payload))
     Docker(**payload).deploy()
 
 
