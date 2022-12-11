@@ -60,6 +60,8 @@ async def deploy(
 ):
     # if hook_is_not_valid:
     #     return hook_is_not_valid
+    data: dict = await request.json()
+    logger.info(f'Data: {data}')
     try:
         data: dict = await request.json()
         logger.info(f'Data: {data}')
