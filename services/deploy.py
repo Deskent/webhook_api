@@ -7,7 +7,7 @@ from typing import Tuple
 from pydantic import BaseModel
 
 from services.utils import send_message_to_admins
-from config import logger, settings
+from config import logger, settings, BASE_DIR
 from services.exceptions import (
     WrongVersionException, WrongBuildException, ContainerBuildError, ContainerTestError,
     ContainerRunError, ContainerPrepareError
@@ -49,14 +49,10 @@ class GitPull(CommandExecutor):
 
         self.report += '\nКлонирование: ОК'
 
-    def pull_repository(self, full_path: str = None, branch: str = '') -> None:
-        if not full_path:
-            full_path = self.full_path
-        if not branch:
-            branch = self.branch
+    def pull_repository(self) -> None:
         if self.run_command(
-                f'cd {full_path}'
-                f'&& git checkout {branch}'
+                f'cd {self.full_path}'
+                f'&& git checkout {self.branch}'
                 f'&& git pull'
         ):
             text = f"\nОшибка пулла"
@@ -191,10 +187,32 @@ def action_report(data: dict) -> None:
     send_message_to_admins(text)
 
 
-def deploy_or_copy(data: dict) -> None:
+def is_branch_valid(data: dict) -> str:
     branch: str = data.get("ref", '').split('/')[-1]
     if branch not in settings.STAGES.keys():
         logger.warning(f'Wrong branch: {branch}')
+        return ''
+    return branch
+
+
+def update_repository(data: dict) -> None:
+    branch: str = is_branch_valid(data)
+    if not branch:
+        return
+    repository = data['repository']
+    git_pull = GitPull(
+        branch=branch,
+        repository_name=repository['name'],
+        user=repository['owner']['name'],
+        full_path=str(BASE_DIR),
+        report=f"Git pull for {repository['name']: \n}"
+    )
+    git_pull.clone_repository()
+
+
+def deploy_or_copy(data: dict) -> None:
+    branch: str = is_branch_valid(data)
+    if not branch:
         return
     stage: str = settings.STAGES[branch]
     ssh_url: str = data.get("repository", {}).get("ssh_url", '')

@@ -13,10 +13,11 @@ class Settings(BaseSettings):
     TELEBOT_TOKEN: str
     STAGE: str
     STAGES: dict
-    CLIENTS: list
-    APPLICATIONS: list
+    CLIENTS: list = []
+    APPLICATIONS: list = []
     GITHUB_SECRET: str
     LOCATION: str
+    UPDATE: list = []
 
 BASE_DIR = Path(__file__)
 settings = Settings(
