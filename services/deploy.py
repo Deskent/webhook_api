@@ -124,11 +124,13 @@ class Docker(Payload):
             self.clone_repository()
         self._copy_env()
         self.pull_repository()
-
+        docker_file_path = self.full_path
+        if not os.path.exists(docker_file_path):
+            docker_file_path = self.path
         status = -1
         for _ in range(2):
             status: int = self.run_command(
-                f'cd {self.full_path} '
+                f'cd {docker_file_path} '
                 f'&& git checkout {self.branch}'
                 f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose build'
             )
