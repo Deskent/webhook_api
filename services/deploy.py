@@ -10,7 +10,7 @@ from services.utils import send_message_to_admins
 from config import logger, settings, BASE_DIR
 from services.exceptions import (
     WrongVersionException, WrongBuildException, ContainerBuildError, ContainerTestError,
-    ContainerRunError, ContainerPrepareError
+    ContainerRunError, ContainerPrepareError, MigrationsError
 )
 
 class CommandExecutor(BaseModel):
@@ -67,6 +67,7 @@ class Payload(GitPull):
     build: str
     ssh_url: str
     container: str = ''
+    do_migration: bool = False
 
 
 class Docker(Payload):
@@ -76,6 +77,8 @@ class Docker(Payload):
             if not self._prepare():
                 return False
             self._build_container()
+            if self.do_migration:
+                self._run_migrations()
             self._testing_container()
             self._running_container()
             self.run_command(f'docker rmi $(docker images -q)')
@@ -144,6 +147,21 @@ class Docker(Payload):
         self.report += text
         logger.debug(f"Docker data: \n{self.dict()}")
         raise ContainerBuildError(detail=text)
+
+    def _run_migrations(self) -> int:
+        logger.info(f"Start migrations container: {self.container}")
+        status = self.run_command(
+            f'cd {self.full_path} '
+            f'&& git checkout {self.branch}'
+            f'&& VERSION="{self.stage}-{self.version}" APPNAME="{self.repository_name.lower()}" docker-compose run --rm app alembic upgrade head'
+        )
+        if status == 0:
+            self.report += "\nМиграции: ОК"
+            return status
+
+        text = "\nОшибка миграций"
+        self.report += text
+        raise MigrationsError(detail=text)
 
     def _testing_container(self):
         logger.info(f"Start testing container: {self.container}")
@@ -222,6 +240,7 @@ def deploy_or_copy(data: dict) -> None:
     ssh_url: str = data.get("repository", {}).get("ssh_url", '')
     repository_name: str = data.get("repository", {}).get("name")
     message: str = data.get("head_commit", {}).get("message", '')
+    do_migration: bool = '__do_migration__' in message
     version, build = _get_version_and_build(message)
     user: str = data.get("repository", {}).get("owner", {}).get("name").lower()
     payload = dict(
@@ -231,7 +250,8 @@ def deploy_or_copy(data: dict) -> None:
         repository_name=repository_name,
         version=version,
         build=build,
-        user=user
+        user=user,
+        do_migration=do_migration
     )
     logger.info(f"Result: {payload}")
     if repository_name.endswith('_client'):

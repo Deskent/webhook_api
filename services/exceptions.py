@@ -46,3 +46,9 @@ class ContainerPrepareError(HTTPException):
     def __init__(self, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                  detail='Container preparing error'):
         super(ContainerPrepareError, self).__init__(status_code=status_code, detail=detail)
+
+
+class MigrationsError(HTTPException):
+    def __init__(self, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                 detail='Container migrations error'):
+        super().__init__(status_code=status_code, detail=detail)
