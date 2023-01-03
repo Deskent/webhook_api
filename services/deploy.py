@@ -207,7 +207,7 @@ def get_action_payload(data: dict) -> dict:
     if workflow_job.get('conclusion') != 'success':
         logger.info(f'Conclusion: {workflow_job.get("conclusion")}')
         return {}
-    branch: str = is_branch_valid(workflow_job.get('head_branch'))
+    branch: str = is_branch_valid(data, workflow_job.get('head_branch'))
     if not branch:
         logger.info(f'Wrong branch: {workflow_job.get("head_branch")}')
         return {}
