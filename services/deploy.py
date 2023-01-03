@@ -195,15 +195,20 @@ class Docker(Payload):
 
 
 def action_report(data: dict) -> None:
-    repository_name: str = data.get("workflow_run", {}).get("repository", {}).get("name")
-    message: str = data.get("workflow_run", {}).get("head_commit", {}).get("message", '')
+    workflow_run: dict = data.get("workflow_run", {})
+    repository_name: str = workflow_run.get("repository", {}).get("name")
+    message: str = workflow_run.get("head_commit", {}).get("message", '')
     version, build = _get_version_and_build(message)
-    conclusion: str = data.get("workflow_run", {}).get("conclusion")
+    conclusion: str = workflow_run.get("conclusion")
+    head_sha: str = workflow_run.get('head_sha')
+    display_title: str = workflow_run.get('display_title')
     text = (
-        f"\nPYPI: {repository_name}"
+        f"\nRepository: {repository_name}"
         f"\n[build:{build}]"
         f"\n[version:{version}]"
         f"\nResult: {conclusion}"
+        f"\nSHA: {head_sha}"
+        f"\nTitle: {display_title}"
     )
     send_message_to_admins(text)
 
@@ -233,6 +238,12 @@ def update_repository(data: dict) -> None:
 
 
 def deploy_or_copy(data: dict) -> None:
+    action: str = data.get('action')
+    if action:
+        action_report(data)
+        if action != 'completed':
+            return
+
     branch: str = is_branch_valid(data)
     if not branch:
         return
