@@ -276,19 +276,15 @@ def deploy_or_copy(data: dict) -> None:
     Docker(**payload).deploy()
 
 
-def action_report(data: dict, version: str = '', build: str = '') -> None:
+def action_report(data: dict) -> None:
     workflow_job: dict = data.get('workflow_job')
     repository_name: str = data.get("repository", {}).get("name")
     result: str = workflow_job.get("conclusion")
-    check_run_url: str = workflow_job.get('check_run_url')
     branch: str = workflow_job.get('head_branch')
     text = (
-        f"\nRepository: {repository_name}"
-        f"\n[build:{build}]"
-        f"\n[version:{version}]"
         f"\nResult: {result}"
+        f"\nRepository: {repository_name}"
         f"\nBranch: {branch}"
-        f"\nUrl: {check_run_url}"
     )
     send_message_to_admins(text)
 
