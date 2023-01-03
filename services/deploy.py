@@ -194,49 +194,6 @@ class Docker(Payload):
         raise ContainerRunError(detail=text)
 
 
-def action_report(data: dict) -> None:
-    workflow_run: dict = data.get("workflow_run", {})
-    repository_name: str = workflow_run.get("repository", {}).get("name")
-    message: str = workflow_run.get("head_commit", {}).get("message", '')
-    version, build = _get_version_and_build(message)
-    conclusion: str = workflow_run.get("conclusion")
-    head_sha: str = workflow_run.get('head_sha')
-    display_title: str = workflow_run.get('display_title')
-    text = (
-        f"\nRepository: {repository_name}"
-        f"\n[build:{build}]"
-        f"\n[version:{version}]"
-        f"\nResult: {conclusion}"
-        f"\nSHA: {head_sha}"
-        f"\nTitle: {display_title}"
-    )
-    send_message_to_admins(text)
-
-
-def is_branch_valid(data: dict) -> str:
-    branch: str = data.get("ref", '').split('/')[-1]
-    if branch not in settings.STAGES.keys():
-        logger.warning(f'Wrong branch: {branch}')
-        return ''
-    return branch
-
-
-def update_repository(data: dict) -> None:
-    branch: str = is_branch_valid(data)
-    if not branch:
-        return
-    repository = data['repository']
-    git_pull = GitPull(
-        path=str(BASE_DIR),
-        branch=branch,
-        repository_name=repository['name'],
-        user=repository['owner']['name'],
-        full_path=str(BASE_DIR),
-        report=f"Git pull for {repository['name']}"
-    )
-    git_pull.pull_repository()
-
-
 def deploy_or_copy(data: dict) -> None:
     action: str = data.get('action')
     if action:
@@ -268,6 +225,53 @@ def deploy_or_copy(data: dict) -> None:
     if repository_name.endswith('_client'):
         return _create_clients_archive_files(payload=Docker(**payload))
     Docker(**payload).deploy()
+
+
+def action_report(data: dict) -> None:
+    workflow_run: dict = data.get("workflow_run", {})
+    repository_name: str = workflow_run.get("repository", {}).get("name")
+    message: str = workflow_run.get("head_commit", {}).get("message", '')
+    version, build = _get_version_and_build(message)
+    conclusion: str = workflow_run.get("conclusion")
+    head_sha: str = workflow_run.get('head_sha')
+    display_title: str = workflow_run.get('display_title')
+    branch: str = workflow_run.get('head_branch')
+    text = (
+        f"\nRepository: {repository_name}"
+        f"\n[build:{build}]"
+        f"\n[version:{version}]"
+        f"\nResult: {conclusion}"
+        f"\nBranch: {branch}"
+        f"\nSHA: {head_sha}"
+        f"\nTitle: {display_title}"
+    )
+    send_message_to_admins(text)
+
+
+def is_branch_valid(data: dict) -> str:
+    branch: str = data.get('workflow_run').get('head_branch')
+    if not branch:
+        branch: str = data.get("ref", '').split('/')[-1]
+    if branch not in settings.STAGES.keys():
+        logger.warning(f'Wrong branch: {branch}')
+        return ''
+    return branch
+
+
+def update_repository(data: dict) -> None:
+    branch: str = is_branch_valid(data)
+    if not branch:
+        return
+    repository = data['repository']
+    git_pull = GitPull(
+        path=str(BASE_DIR),
+        branch=branch,
+        repository_name=repository['name'],
+        user=repository['owner']['name'],
+        full_path=str(BASE_DIR),
+        report=f"Git pull for {repository['name']}"
+    )
+    git_pull.pull_repository()
 
 
 def _get_version_and_build(message: str) -> Tuple[str, ...]:
