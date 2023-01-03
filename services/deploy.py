@@ -249,7 +249,8 @@ def action_report(data: dict) -> None:
 
 
 def is_branch_valid(data: dict) -> str:
-    branch: str = data.get('workflow_run').get('head_branch')
+    workflow_run: dict = data.get("workflow_run", {})
+    branch: str = workflow_run.get('head_branch')
     if not branch:
         branch: str = data.get("ref", '').split('/')[-1]
     if branch not in settings.STAGES.keys():
