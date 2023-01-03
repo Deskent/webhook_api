@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import subprocess
@@ -195,6 +196,8 @@ class Docker(Payload):
 
 
 def get_action_payload(data: dict) -> dict:
+    with open('data.json', 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
     workflow_run: dict = data.get("workflow_run", {})
     if data.get('action') != 'completed':
         logger.info(f'Action: {data.get("action")}')
