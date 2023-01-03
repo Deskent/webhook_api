@@ -224,7 +224,7 @@ def get_action_payload(data: dict) -> dict:
     if message:
         version, build = _get_version_and_build(message)
 
-    action_report(data, version, build)
+    action_report(data)
 
     return dict(
         stage=stage,
