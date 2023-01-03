@@ -5,7 +5,7 @@ import json
 from fastapi import APIRouter, Request, Header, Response, status, Depends
 
 from config import logger, settings
-from services.deploy import deploy_or_copy, action_report, update_repository
+from services.deploy import deploy_or_copy, update_repository
 
 
 root_router = APIRouter()
@@ -62,17 +62,13 @@ async def deploy(
 
     try:
         data: dict = await request.json()
-        data_str = '\n'.join(f"{k}: {v}" for k, v in data.items())
+        data_str = '\n\n'.join(f"{k}: {v}" for k, v in data.items())
         logger.debug(f"Data: \n{data_str}")
         if data['repository']['name'] in settings.UPDATE:
             update_repository(data)
-        elif data.get('action') == 'completed':
-            action_report(data)
         else:
             deploy_or_copy(data)
     except json.decoder.JSONDecodeError as err:
         logger.error(err)
         return {"result": "json error"}
     return {"result": "ok"}
-
-
