@@ -281,10 +281,12 @@ def action_report(data: dict) -> None:
     repository_name: str = data.get("repository", {}).get("name")
     result: str = workflow_job.get("conclusion")
     branch: str = workflow_job.get('head_branch')
+    head_sha: str = workflow_job.get('head_sha')
     text = (
-        f"\nResult: {result}"
+        f"\nAction result: {result}"
         f"\nRepository: {repository_name}"
         f"\nBranch: {branch}"
+        f"\nSHA: {head_sha}"
     )
     send_message_to_admins(text)
 
