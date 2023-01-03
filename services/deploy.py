@@ -194,24 +194,27 @@ class Docker(Payload):
         raise ContainerRunError(detail=text)
 
 
-def deploy_or_copy(data: dict) -> None:
-    action: str = data.get('action')
-    if action:
-        action_report(data)
-        if action != 'completed':
-            return
-
-    branch: str = is_branch_valid(data)
+def get_action_payload(data: dict) -> dict:
+    workflow_run: dict = data.get("workflow_run", {})
+    if data.get('action') != 'completed':
+        logger.info(f'Action: {data.get("action")}')
+        return {}
+    action_report(workflow_run)
+    if workflow_run.get('conclusion') != 'success':
+        logger.info(f'Conclusion: {workflow_run.get("conclusion")}')
+        return {}
+    branch: str = is_branch_valid(workflow_run.get('head_branch'))
     if not branch:
-        return
+        logger.info(f'Wrong branch: {workflow_run.get("head_branch")}')
+        return {}
     stage: str = settings.STAGES[branch]
-    ssh_url: str = data.get("repository", {}).get("ssh_url", '')
-    repository_name: str = data.get("repository", {}).get("name")
-    message: str = data.get("head_commit", {}).get("message", '')
+    repository_name: str = workflow_run.get("repository", {}).get("name")
+    user: str = workflow_run.get("repository", {}).get("owner", {}).get("name").lower()
+    ssh_url: str = f"git@github.com:{user}/{repository_name}.git"
+    message: str = workflow_run.get("head_commit", {}).get("message", '')
     do_migration: bool = '__do_migration__' in message
     version, build = _get_version_and_build(message)
-    user: str = data.get("repository", {}).get("owner", {}).get("name").lower()
-    payload = dict(
+    return dict(
         stage=stage,
         branch=branch,
         ssh_url=ssh_url,
@@ -221,8 +224,42 @@ def deploy_or_copy(data: dict) -> None:
         user=user,
         do_migration=do_migration
     )
+
+
+def get_not_action_payload(data: dict) -> dict:
+    branch: str = is_branch_valid(data)
+    if not branch:
+        return {}
+    stage: str = settings.STAGES[branch]
+    ssh_url: str = data.get("repository", {}).get("ssh_url", '')
+    repository_name: str = data.get("repository", {}).get("name")
+    message: str = data.get("head_commit", {}).get("message", '')
+    do_migration: bool = '__do_migration__' in message
+    version, build = _get_version_and_build(message)
+    user: str = data.get("repository", {}).get("owner", {}).get("name").lower()
+    return dict(
+        stage=stage,
+        branch=branch,
+        ssh_url=ssh_url,
+        repository_name=repository_name,
+        version=version,
+        build=build,
+        user=user,
+        do_migration=do_migration
+    )
+
+
+def deploy_or_copy(data: dict) -> None:
+    if data.get('action'):
+        payload = get_action_payload(data)
+        logger.info(f'\n\nPayload with action: {payload} \n\n')
+    else:
+        payload = get_not_action_payload(data)
+    if not payload:
+        return
+
     logger.info(f"Result: {payload}")
-    if repository_name.endswith('_client'):
+    if payload['repository_name'].endswith('_client'):
         return _create_clients_archive_files(payload=Docker(**payload))
     Docker(**payload).deploy()
 
@@ -248,9 +285,7 @@ def action_report(data: dict) -> None:
     send_message_to_admins(text)
 
 
-def is_branch_valid(data: dict) -> str:
-    workflow_run: dict = data.get("workflow_run", {})
-    branch: str = workflow_run.get('head_branch')
+def is_branch_valid(data: dict, branch: str = '') -> str:
     if not branch:
         branch: str = data.get("ref", '').split('/')[-1]
     if branch not in settings.STAGES.keys():
