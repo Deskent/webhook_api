@@ -3,6 +3,7 @@
 **/.idea
 **/spam
 **/logs
+.editorconfig
 
 
 # Byte-compiled / optimized / DLL files
