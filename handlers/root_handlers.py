@@ -57,8 +57,10 @@ async def deploy(
         request: Request,
         hook_is_not_valid: dict = Depends(check_hook)
 ):
+    answer: dict = {"result": "ok"}
     if hook_is_not_valid:
-        return hook_is_not_valid
+        logger.warning(hook_is_not_valid)
+        return answer
 
     try:
         data: dict = await request.json()
@@ -70,5 +72,4 @@ async def deploy(
             deploy_or_copy(data)
     except json.decoder.JSONDecodeError as err:
         logger.error(err)
-        return {"result": "json error"}
-    return {"result": "ok"}
+    return answer
