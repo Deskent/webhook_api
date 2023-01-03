@@ -198,25 +198,34 @@ class Docker(Payload):
 def get_action_payload(data: dict) -> dict:
     with open('data.json', 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
-    workflow_run: dict = data.get("workflow_run", {})
     if data.get('action') != 'completed':
         logger.info(f'Action: {data.get("action")}')
         return {}
-    action_report(workflow_run)
-    if workflow_run.get('conclusion') != 'success':
-        logger.info(f'Conclusion: {workflow_run.get("conclusion")}')
+
+    workflow_job: dict = data.get("workflow_job", {})
+
+    if workflow_job.get('conclusion') != 'success':
+        logger.info(f'Conclusion: {workflow_job.get("conclusion")}')
         return {}
-    branch: str = is_branch_valid(workflow_run.get('head_branch'))
+    branch: str = is_branch_valid(workflow_job.get('head_branch'))
     if not branch:
-        logger.info(f'Wrong branch: {workflow_run.get("head_branch")}')
+        logger.info(f'Wrong branch: {workflow_job.get("head_branch")}')
         return {}
+
     stage: str = settings.STAGES[branch]
-    repository_name: str = workflow_run.get("repository", {}).get("name")
-    user: str = workflow_run.get("repository", {}).get("owner", {}).get("name").lower()
-    ssh_url: str = f"git@github.com:{user}/{repository_name}.git"
-    message: str = workflow_run.get("head_commit", {}).get("message", '')
+
+    repository_name: str = data.get("repository", {}).get("name")
+    user: str = data.get("repository", {}).get("owner", {}).get("login").lower()
+    ssh_url: str = data.get("repository", {}).get("ssh_url")
+
+    message: str = data.get("head_commit", {}).get("message", '')
     do_migration: bool = '__do_migration__' in message
-    version, build = _get_version_and_build(message)
+    version = build = workflow_job.get('head_sha')
+    if message:
+        version, build = _get_version_and_build(message)
+
+    action_report(data, version, build)
+
     return dict(
         stage=stage,
         branch=branch,
@@ -267,23 +276,19 @@ def deploy_or_copy(data: dict) -> None:
     Docker(**payload).deploy()
 
 
-def action_report(data: dict) -> None:
-    workflow_run: dict = data.get("workflow_run", {})
-    repository_name: str = workflow_run.get("repository", {}).get("name")
-    message: str = workflow_run.get("head_commit", {}).get("message", '')
-    version, build = _get_version_and_build(message)
-    conclusion: str = workflow_run.get("conclusion")
-    head_sha: str = workflow_run.get('head_sha')
-    display_title: str = workflow_run.get('display_title')
-    branch: str = workflow_run.get('head_branch')
+def action_report(data: dict, version: str = '', build: str = '') -> None:
+    workflow_job: dict = data.get('workflow_job')
+    repository_name: str = data.get("repository", {}).get("name")
+    result: str = workflow_job.get("conclusion")
+    check_run_url: str = workflow_job.get('check_run_url')
+    branch: str = workflow_job.get('head_branch')
     text = (
         f"\nRepository: {repository_name}"
         f"\n[build:{build}]"
         f"\n[version:{version}]"
-        f"\nResult: {conclusion}"
+        f"\nResult: {result}"
         f"\nBranch: {branch}"
-        f"\nSHA: {head_sha}"
-        f"\nTitle: {display_title}"
+        f"\nUrl: {check_run_url}"
     )
     send_message_to_admins(text)
 
@@ -316,13 +321,13 @@ def update_repository(data: dict) -> None:
 def _get_version_and_build(message: str) -> Tuple[str, ...]:
     version: list = re.findall(r"version:(.{,20})]", message)
     if not version:
-        text = f"Wrong version: {message}"
+        text = f"Version not found in message: {message}"
         logger.error(text)
         send_message_to_admins(text)
         raise WrongVersionException
     build: list = re.findall(r'build:(.{,20})]', message)
     if not build:
-        text = f"Wrong build: {message}"
+        text = f"Build not found in message: {message}"
         logger.error(text)
         send_message_to_admins(text)
         raise WrongBuildException
